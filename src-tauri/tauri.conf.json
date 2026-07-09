@@ -23,6 +23,20 @@
         "visible": false,
         "skipTaskbar": true,
         "center": true
+      },
+      {
+        "label": "widget",
+        "title": "Aether Widget",
+        "url": "index.html?window=widget",
+        "width": 280,
+        "height": 180,
+        "resizable": false,
+        "fullscreen": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": false,
+        "visible": true,
+        "skipTaskbar": true
       }
     ],
     "security": {

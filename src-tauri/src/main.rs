@@ -43,7 +43,8 @@ fn main() {
             commands::save_capture,
             commands::hide_window,
             commands::search_captures,
-            commands::toggle_task_completion
+            commands::toggle_task_completion,
+            commands::get_widget_data
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
