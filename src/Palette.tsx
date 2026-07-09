@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 export default function Palette() {
   const [text, setText] = useState("");
   const [results, setResults] = useState<string[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState<number>(-1);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const focusInput = () => {
@@ -25,6 +26,7 @@ export default function Palette() {
     const handleWindowBlur = () => {
       setText("");
       setResults([]);
+      setSelectedIndex(-1);
       invoke("hide_window").catch(console.error);
     };
 
@@ -50,28 +52,58 @@ export default function Palette() {
     } else {
       setResults([]);
     }
+    setSelectedIndex(-1); // Reset selected result on text change
+  };
+
+  const handleCopyAndClose = async (val: string) => {
+    try {
+      await navigator.clipboard.writeText(val);
+      console.log("Copied to clipboard:", val);
+      setText("");
+      setResults([]);
+      setSelectedIndex(-1);
+      await invoke("hide_window");
+    } catch (err) {
+      console.error("Failed to copy to clipboard:", err);
+    }
   };
 
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      const trimmed = text.trim();
-      if (trimmed) {
-        try {
-          // Persist capture to SQLite database
-          await invoke("save_capture", { text: trimmed });
-          // Clear input text and results
-          setText("");
-          setResults([]);
-          // Hide palette window
-          await invoke("hide_window");
-        } catch (error) {
-          console.error("Failed to save capture:", error);
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (results.length > 0) {
+        setSelectedIndex((prev) => (prev + 1 >= results.length ? -1 : prev + 1));
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (results.length > 0) {
+        setSelectedIndex((prev) => (prev - 1 < -1 ? results.length - 1 : prev - 1));
+      }
+    } else if (e.key === "Enter") {
+      if (selectedIndex >= 0 && selectedIndex < results.length) {
+        await handleCopyAndClose(results[selectedIndex]);
+      } else {
+        const trimmed = text.trim();
+        if (trimmed) {
+          try {
+            // Persist capture to SQLite database
+            await invoke("save_capture", { text: trimmed });
+            // Clear input text and results
+            setText("");
+            setResults([]);
+            setSelectedIndex(-1);
+            // Hide palette window
+            await invoke("hide_window");
+          } catch (error) {
+            console.error("Failed to save capture:", error);
+          }
         }
       }
     } else if (e.key === "Escape") {
       // Discard input text and results
       setText("");
       setResults([]);
+      setSelectedIndex(-1);
       // Hide palette window
       invoke("hide_window").catch(console.error);
     }
@@ -101,7 +133,12 @@ export default function Palette() {
           {results.map((res, idx) => (
             <div
               key={idx}
-              className="px-3 py-2 text-neutral-300 rounded-lg text-sm font-light truncate"
+              onClick={() => handleCopyAndClose(res)}
+              className={`px-3 py-2 rounded-lg text-sm font-light truncate cursor-pointer transition-colors duration-100 ${
+                idx === selectedIndex
+                  ? "bg-indigo-500/20 text-indigo-200 border-l-2 border-indigo-500 pl-2.5"
+                  : "text-neutral-300 hover:bg-neutral-800/50"
+              }`}
             >
               {res}
             </div>
