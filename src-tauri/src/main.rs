@@ -44,7 +44,8 @@ fn main() {
             commands::hide_window,
             commands::search_captures,
             commands::toggle_task_completion,
-            commands::get_widget_data
+            commands::get_widget_data,
+            commands::toggle_focus_mode
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

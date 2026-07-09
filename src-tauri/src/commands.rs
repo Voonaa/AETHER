@@ -2,10 +2,33 @@ use tauri::State;
 use crate::DbState;
 
 #[tauri::command]
-pub fn save_capture(text: String, state: State<'_, DbState>) -> Result<(), String> {
+pub fn save_capture(text: String, state: State<'_, DbState>) -> Result<String, String> {
     let trimmed = text.trim();
     if trimmed.is_empty() {
         return Err("Cannot save empty capture".to_string());
+    }
+
+    // Intercept /focus command
+    if trimmed.to_lowercase() == "/focus" {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        let current_val: String = conn
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'focus_mode'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or_else(|_| "false".to_string());
+
+        let next_val = if current_val == "true" { "false" } else { "true" };
+
+        conn.execute(
+            "UPDATE settings SET value = ?1 WHERE key = 'focus_mode'",
+            [next_val],
+        )
+        .map_err(|e| e.to_string())?;
+
+        println!("Command parsed: /focus. Toggled Focus Mode to: {}", next_val);
+        return Ok(if next_val == "true" { "focus_enabled".to_string() } else { "focus_disabled".to_string() });
     }
 
     // Parse slash command prefixes
@@ -31,7 +54,7 @@ pub fn save_capture(text: String, state: State<'_, DbState>) -> Result<(), Strin
     .map_err(|e| e.to_string())?;
 
     println!("Saved capture: [{}] {}", cap_type, content_trimmed);
-    Ok(())
+    Ok("saved".to_string())
 }
 
 #[tauri::command]
@@ -239,10 +262,46 @@ pub fn get_widget_data(state: State<'_, DbState>) -> Result<WidgetData, String> 
         )
         .ok();
 
+    // 4. Query focus mode setting
+    let focus_mode_str: String = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'focus_mode'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or_else(|_| "false".to_string());
+    let focus_mode = focus_mode_str == "true";
+
     Ok(WidgetData {
         date: date_str,
         tasks,
         last_note,
-        focus_mode: false,
+        focus_mode,
     })
+}
+
+#[tauri::command]
+pub fn toggle_focus_mode(state: State<'_, DbState>) -> Result<bool, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+
+    // Read current focus mode value
+    let current_val: String = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'focus_mode'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or_else(|_| "false".to_string());
+
+    let next_val = if current_val == "true" { "false" } else { "true" };
+
+    // Write new value to settings table
+    conn.execute(
+        "UPDATE settings SET value = ?1 WHERE key = 'focus_mode'",
+        [next_val],
+    )
+    .map_err(|e| e.to_string())?;
+
+    println!("Toggled Focus Mode in database to: {}", next_val);
+    Ok(next_val == "true")
 }

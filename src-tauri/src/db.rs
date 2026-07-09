@@ -97,6 +97,23 @@ pub fn init_db(app_data_dir: &Path) -> Result<Connection, String> {
         [],
     )
     .map_err(|e| e.to_string())?;
+
+    // Create the settings table if it doesn't exist
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )",
+        [],
+    )
+    .map_err(|e| e.to_string())?;
+
+    // Seed default focus_mode value if not present
+    conn.execute(
+        "INSERT OR IGNORE INTO settings (key, value) VALUES ('focus_mode', 'false')",
+        [],
+    )
+    .map_err(|e| e.to_string())?;
     
     Ok(conn)
 }

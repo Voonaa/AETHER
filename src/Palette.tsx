@@ -21,6 +21,11 @@ export default function Palette() {
   };
 
   useEffect(() => {
+    // Request notification permissions on mount
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
     // Focus immediately on mount
     focusInput();
 
@@ -109,7 +114,18 @@ export default function Palette() {
         if (trimmed) {
           try {
             // Persist capture to SQLite database
-            await invoke("save_capture", { text: trimmed });
+            const status = await invoke<string>("save_capture", { text: trimmed });
+            
+            // Check if Focus Mode was toggled via slash command
+            if ((status === "focus_enabled" || status === "focus_disabled") && Notification.permission === "granted") {
+              new Notification("Aether Focus Mode", {
+                body: status === "focus_enabled"
+                  ? "Focus Mode Active. Go make progress!"
+                  : "Focus Mode Off. Welcome back.",
+                silent: true
+              });
+            }
+
             // Clear input text and results
             setText("");
             setResults([]);

@@ -23,12 +23,18 @@ export default function Widget() {
     try {
       const widgetData = await invoke<WidgetData>("get_widget_data");
       setData(widgetData);
+      setFocusMode(widgetData.focus_mode);
     } catch (err) {
       console.error("Failed to fetch widget data:", err);
     }
   };
 
   useEffect(() => {
+    // Request notification permissions on mount
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
     // Initial fetch
     fetchWidgetData();
 
@@ -48,17 +54,47 @@ export default function Widget() {
     }
   };
 
+  const handleToggleFocus = async () => {
+    try {
+      const active = await invoke<boolean>("toggle_focus_mode");
+      setFocusMode(active);
+      if (Notification.permission === "granted") {
+        new Notification("Aether Focus Mode", {
+          body: active 
+            ? "Focus Mode Active. Go make progress!" 
+            : "Focus Mode Off. Welcome back.",
+          silent: true
+        });
+      }
+      // Refresh list
+      await fetchWidgetData();
+    } catch (err) {
+      console.error("Failed to toggle focus mode:", err);
+    }
+  };
+
+  // Filter tasks to show only top priority task in Focus Mode
+  const tasksToRender = data 
+    ? (focusMode ? data.tasks.slice(0, 1) : data.tasks)
+    : [];
+
   return (
-    <div className="w-full h-full p-4 bg-[#0E0E10]/75 backdrop-blur-md border border-neutral-800/40 rounded-2xl flex flex-col justify-between text-white font-sans select-none shadow-[0_12px_40px_rgba(0,0,0,0.5)]">
+    <div className={`w-full h-full p-4 bg-[#0E0E10]/75 backdrop-blur-md border rounded-2xl flex flex-col justify-between text-white font-sans select-none shadow-[0_12px_40px_rgba(0,0,0,0.5)] transition-all duration-300 ${
+      focusMode 
+        ? "border-indigo-500/50 shadow-[0_0_20px_rgba(99,102,241,0.15)]" 
+        : "border-neutral-800/40"
+    }`}>
       {/* Header */}
       <div className="flex justify-between items-center border-b border-neutral-800/30 pb-2">
         <div className="flex flex-col">
-          <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-semibold">Surfaced</span>
+          <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-semibold">
+            {focusMode ? "Focusing" : "Surfaced"}
+          </span>
           <span className="text-sm font-semibold text-neutral-200">{data?.date || "Today"}</span>
         </div>
         {/* Focus Mode Pill Toggle */}
         <button 
-          onClick={() => setFocusMode(!focusMode)}
+          onClick={handleToggleFocus}
           className={`px-2.5 py-1 rounded-full text-[10px] font-medium tracking-wide transition-all duration-200 cursor-pointer outline-none ${
             focusMode 
               ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 shadow-[0_0_12px_rgba(99,102,241,0.2)]" 
@@ -71,8 +107,8 @@ export default function Widget() {
 
       {/* Tasks List */}
       <div className="flex-1 flex flex-col gap-2 my-2 justify-center">
-        {data && data.tasks.length > 0 ? (
-          data.tasks.map((task) => (
+        {tasksToRender.length > 0 ? (
+          tasksToRender.map((task) => (
             <div 
               key={task.id} 
               onClick={() => handleToggleTask(task.id)}
@@ -94,12 +130,14 @@ export default function Widget() {
       </div>
 
       {/* Footer */}
-      <div className="border-t border-neutral-800/30 pt-2 flex flex-col">
-        <span className="text-[9px] text-neutral-500 uppercase tracking-widest font-semibold">Latest Note</span>
-        <span className="text-xs font-light text-neutral-400 italic truncate mt-0.5">
-          {data?.last_note || "No notes captured yet"}
-        </span>
-      </div>
+      {!focusMode && (
+        <div className="border-t border-neutral-800/30 pt-2 flex flex-col transition-all duration-200">
+          <span className="text-[9px] text-neutral-500 uppercase tracking-widest font-semibold">Latest Note</span>
+          <span className="text-xs font-light text-neutral-400 italic truncate mt-0.5">
+            {data?.last_note || "No notes captured yet"}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
