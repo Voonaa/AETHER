@@ -14,7 +14,7 @@
         "label": "main",
         "title": "Aether",
         "width": 600,
-        "height": 60,
+        "height": 240,
         "resizable": false,
         "fullscreen": false,
         "decorations": false,
