@@ -1,0 +1,16 @@
+[package]
+name = "aether"
+version = "0.1.0"
+description = "Aether - Ambient Productivity Layer"
+authors = ["Voonaa"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0.3", features = [] }
+
+[dependencies]
+tauri = { version = "2.0.6", features = [] }
+tauri-plugin-global-shortcut = "2.0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rusqlite = { version = "0.31.0", features = ["bundled"] }
