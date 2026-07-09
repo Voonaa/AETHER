@@ -8,15 +8,29 @@ pub fn save_capture(text: String, state: State<'_, DbState>) -> Result<(), Strin
         return Err("Cannot save empty capture".to_string());
     }
 
-    // Lock connection Mutex and execute insert query
+    // Parse slash command prefixes
+    let (content, cap_type) = if trimmed.to_lowercase().starts_with("/task ") {
+        (&trimmed[6..], "task")
+    } else if trimmed.to_lowercase().starts_with("/note ") {
+        (&trimmed[6..], "note")
+    } else {
+        (trimmed, "note")
+    };
+
+    let content_trimmed = content.trim();
+    if content_trimmed.is_empty() {
+        return Err("Cannot save empty capture content".to_string());
+    }
+
+    // Lock connection Mutex and execute insert query with type classification
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
-        "INSERT INTO captures (text) VALUES (?1)",
-        [trimmed],
+        "INSERT INTO captures (text, type) VALUES (?1, ?2)",
+        [content_trimmed, cap_type],
     )
     .map_err(|e| e.to_string())?;
 
-    println!("Saved capture: {}", trimmed);
+    println!("Saved capture: [{}] {}", cap_type, content_trimmed);
     Ok(())
 }
 

@@ -20,6 +20,30 @@ pub fn init_db(app_data_dir: &Path) -> Result<Connection, String> {
         [],
     )
     .map_err(|e| e.to_string())?;
+
+    // Check if 'type' column exists in 'captures' table
+    let mut has_type_column = false;
+    {
+        let mut stmt = conn.prepare("PRAGMA table_info(captures)").map_err(|e| e.to_string())?;
+        let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
+        while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+            let col_name: String = row.get(1).map_err(|e| e.to_string())?;
+            if col_name == "type" {
+                has_type_column = true;
+                break;
+            }
+        }
+    }
+
+    // Add 'type' column if missing (safe schema migration)
+    if !has_type_column {
+        conn.execute(
+            "ALTER TABLE captures ADD COLUMN type TEXT NOT NULL DEFAULT 'note'",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+        println!("Database migration: Added 'type' column to 'captures' table.");
+    }
     
     // Create the FTS5 virtual table for full-text search index
     conn.execute(
