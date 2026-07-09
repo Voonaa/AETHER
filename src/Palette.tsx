@@ -1,9 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
+interface SearchResult {
+  id: number;
+  text: string;
+  cap_type: string;
+  completed: boolean;
+}
+
 export default function Palette() {
   const [text, setText] = useState("");
-  const [results, setResults] = useState<string[]>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -44,7 +51,7 @@ export default function Palette() {
     const trimmed = val.trim();
     if (trimmed.length > 0) {
       try {
-        const searchRes = await invoke<string[]>("search_captures", { query: trimmed });
+        const searchRes = await invoke<SearchResult[]>("search_captures", { query: trimmed });
         setResults(searchRes);
       } catch (err) {
         console.error("Search failed:", err);
@@ -55,16 +62,31 @@ export default function Palette() {
     setSelectedIndex(-1); // Reset selected result on text change
   };
 
-  const handleCopyAndClose = async (val: string) => {
-    try {
-      await navigator.clipboard.writeText(val);
-      console.log("Copied to clipboard:", val);
-      setText("");
-      setResults([]);
-      setSelectedIndex(-1);
-      await invoke("hide_window");
-    } catch (err) {
-      console.error("Failed to copy to clipboard:", err);
+  const handleSelectAction = async (item: SearchResult) => {
+    if (item.cap_type === "task") {
+      try {
+        // Toggle task completion in SQLite database
+        await invoke("toggle_task_completion", { id: item.id });
+        console.log("Toggled task completion for:", item.text);
+        setText("");
+        setResults([]);
+        setSelectedIndex(-1);
+        await invoke("hide_window");
+      } catch (err) {
+        console.error("Failed to toggle task:", err);
+      }
+    } else {
+      try {
+        // Copy standard note to clipboard
+        await navigator.clipboard.writeText(item.text);
+        console.log("Copied to clipboard:", item.text);
+        setText("");
+        setResults([]);
+        setSelectedIndex(-1);
+        await invoke("hide_window");
+      } catch (err) {
+        console.error("Failed to copy to clipboard:", err);
+      }
     }
   };
 
@@ -81,7 +103,7 @@ export default function Palette() {
       }
     } else if (e.key === "Enter") {
       if (selectedIndex >= 0 && selectedIndex < results.length) {
-        await handleCopyAndClose(results[selectedIndex]);
+        await handleSelectAction(results[selectedIndex]);
       } else {
         const trimmed = text.trim();
         if (trimmed) {
@@ -109,6 +131,20 @@ export default function Palette() {
     }
   };
 
+  const renderCheckbox = (completed: boolean) => {
+    return (
+      <div className={`w-4 h-4 rounded border flex items-center justify-center mr-2.5 transition-all duration-150 ${
+        completed 
+          ? "bg-indigo-500 border-indigo-500 text-indigo-100" 
+          : "border-neutral-600 bg-neutral-900/40 text-transparent"
+      }`}>
+        <svg className="w-2.5 h-2.5 stroke-[3] stroke-current" fill="none" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+        </svg>
+      </div>
+    );
+  };
+
   return (
     <div className="w-full h-full flex flex-col p-1 bg-transparent select-none">
       {/* Input Wrapper */}
@@ -132,15 +168,16 @@ export default function Palette() {
         <div className="w-full flex flex-col gap-1 mt-2 bg-[#0E0E10]/95 backdrop-blur-xl border border-neutral-800/80 rounded-xl p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.6)]">
           {results.map((res, idx) => (
             <div
-              key={idx}
-              onClick={() => handleCopyAndClose(res)}
-              className={`px-3 py-2 rounded-lg text-sm font-light truncate cursor-pointer transition-colors duration-100 ${
+              key={res.id}
+              onClick={() => handleSelectAction(res)}
+              className={`px-3 py-2 rounded-lg text-sm font-light truncate cursor-pointer flex items-center transition-colors duration-100 ${
                 idx === selectedIndex
                   ? "bg-indigo-500/20 text-indigo-200 border-l-2 border-indigo-500 pl-2.5"
                   : "text-neutral-300 hover:bg-neutral-800/50"
               }`}
             >
-              {res}
+              {res.cap_type === "task" && renderCheckbox(res.completed)}
+              <span className="flex-1 truncate">{res.text}</span>
             </div>
           ))}
         </div>

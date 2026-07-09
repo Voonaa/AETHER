@@ -42,7 +42,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::save_capture,
             commands::hide_window,
-            commands::search_captures
+            commands::search_captures,
+            commands::toggle_task_completion
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

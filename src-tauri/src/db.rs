@@ -44,6 +44,30 @@ pub fn init_db(app_data_dir: &Path) -> Result<Connection, String> {
         .map_err(|e| e.to_string())?;
         println!("Database migration: Added 'type' column to 'captures' table.");
     }
+
+    // Check if 'completed' column exists in 'captures' table
+    let mut has_completed_column = false;
+    {
+        let mut stmt = conn.prepare("PRAGMA table_info(captures)").map_err(|e| e.to_string())?;
+        let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
+        while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+            let col_name: String = row.get(1).map_err(|e| e.to_string())?;
+            if col_name == "completed" {
+                has_completed_column = true;
+                break;
+            }
+        }
+    }
+
+    // Add 'completed' column if missing (safe schema migration)
+    if !has_completed_column {
+        conn.execute(
+            "ALTER TABLE captures ADD COLUMN completed INTEGER NOT NULL DEFAULT 0",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+        println!("Database migration: Added 'completed' column to 'captures' table.");
+    }
     
     // Create the FTS5 virtual table for full-text search index
     conn.execute(
