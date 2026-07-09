@@ -1,4 +1,4 @@
-use tauri::State;
+use tauri::{State, Manager};
 use crate::DbState;
 
 #[tauri::command]
@@ -304,4 +304,14 @@ pub fn toggle_focus_mode(state: State<'_, DbState>) -> Result<bool, String> {
 
     println!("Toggled Focus Mode in database to: {}", next_val);
     Ok(next_val == "true")
+}
+
+#[tauri::command]
+pub fn show_palette(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(main_win) = app.get_webview_window("main") {
+        main_win.show().map_err(|e| e.to_string())?;
+        main_win.set_focus().map_err(|e| e.to_string())?;
+        println!("Launcher main window shown and focused from widget click");
+    }
+    Ok(())
 }

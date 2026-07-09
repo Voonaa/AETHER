@@ -37,6 +37,20 @@ fn main() {
                 });
             }
 
+            // Force widget window to reside at HWND_BOTTOM on Windows
+            #[cfg(target_os = "windows")]
+            {
+                if let Some(widget) = app.get_webview_window("widget") {
+                    if let Ok(hwnd) = widget.hwnd() {
+                        use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowPos, HWND_BOTTOM, SWP_NOMOVE, SWP_NOSIZE, SWP_NOACTIVATE};
+                        unsafe {
+                            SetWindowPos(hwnd.0 as _, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                        }
+                        println!("Widget window successfully positioned at HWND_BOTTOM");
+                    }
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -45,7 +59,8 @@ fn main() {
             commands::search_captures,
             commands::toggle_task_completion,
             commands::get_widget_data,
-            commands::toggle_focus_mode
+            commands::toggle_focus_mode,
+            commands::show_palette
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

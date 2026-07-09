@@ -78,12 +78,27 @@ export default function Widget() {
     ? (focusMode ? data.tasks.slice(0, 1) : data.tasks)
     : [];
 
+  const handleOpenPalette = async (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest("button") || target.closest("input") || target.closest("svg") || target.closest(".cursor-pointer")) {
+      return;
+    }
+    try {
+      await invoke("show_palette");
+    } catch (err) {
+      console.error("Failed to show palette:", err);
+    }
+  };
+
   return (
-    <div className={`w-full h-full p-4 bg-[#0E0E10]/75 backdrop-blur-md border rounded-2xl flex flex-col justify-between text-white font-sans select-none shadow-[0_12px_40px_rgba(0,0,0,0.5)] transition-all duration-300 ${
-      focusMode 
-        ? "border-indigo-500/50 shadow-[0_0_20px_rgba(99,102,241,0.15)]" 
-        : "border-neutral-800/40"
-    }`}>
+    <div 
+      onClick={handleOpenPalette}
+      className={`w-full h-full p-4 bg-[#0E0E10]/75 backdrop-blur-md border rounded-2xl flex flex-col justify-between text-white font-sans select-none shadow-[0_12px_40px_rgba(0,0,0,0.5)] transition-all duration-300 ${
+        focusMode 
+          ? "border-indigo-500/50 shadow-[0_0_20px_rgba(99,102,241,0.15)]" 
+          : "border-neutral-800/40"
+      }`}
+    >
       {/* Header */}
       <div className="flex justify-between items-center border-b border-neutral-800/30 pb-2">
         <div className="flex flex-col">
