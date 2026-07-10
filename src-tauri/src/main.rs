@@ -73,7 +73,9 @@ fn main() {
             commands::delete_habit,
             commands::toggle_habit_completion,
             commands::get_user_stats,
-            commands::add_xp
+            commands::add_xp,
+            commands::get_theme,
+            commands::set_theme
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

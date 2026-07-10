@@ -582,3 +582,19 @@ pub fn add_xp(amount: i64, state: State<'_, DbState>) -> Result<UserStats, Strin
     add_xp_internal(amount, state)
 }
 
+#[tauri::command]
+pub fn get_theme(state: State<'_, DbState>) -> Result<String, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let theme: String = conn.query_row("SELECT value FROM settings WHERE key = 'user_theme'", [], |r| r.get(0))
+        .unwrap_or_else(|_| "navy".to_string());
+    Ok(theme)
+}
+
+#[tauri::command]
+pub fn set_theme(theme: String, state: State<'_, DbState>) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('user_theme', ?1)", [theme])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+

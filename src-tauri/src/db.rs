@@ -74,6 +74,10 @@ pub fn init_db(app_data_dir: &Path) -> Result<Connection, String> {
         "INSERT OR IGNORE INTO settings (key, value) VALUES ('user_level', '1')", [],
     ).map_err(|e| e.to_string())?;
 
+    conn.execute(
+        "INSERT OR IGNORE INTO settings (key, value) VALUES ('user_theme', 'navy')", [],
+    ).map_err(|e| e.to_string())?;
+
     // ── habits table ──────────────────────────────────────────
     conn.execute(
         "CREATE TABLE IF NOT EXISTS habits (

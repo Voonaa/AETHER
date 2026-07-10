@@ -9,22 +9,76 @@ interface Motivation { id: number; text: string; author: string; }
 interface Habit      { id: number; text: string; streak: number; last_completed: string|null; }
 interface UserStats  { xp: number; level: number; }
 
-// ── Design tokens ────────────────────────────────────────────
-const C = {
-  bg:          "#0a0f18",           // deep midnight navy
-  bgSurf:      "rgba(255,255,255,0.025)",
-  bgSurf2:     "rgba(255,255,255,0.055)",
-  border:      "rgba(255,255,255,0.06)",
-  borderAcc:   "rgba(99,102,241,0.3)",
-  textPrimary: "#f1f5f9",           // slate 100
-  textSec:     "#94a3b8",           // slate 400
-  textMuted:   "#475569",           // slate 600
-  accent:      "#6366f1",           // indigo 500
-  accentLight: "#a5b4fc",           // indigo 300
-  accentGlow:  "rgba(99,102,241,0.18)",
-  success:     "#10b981",           // emerald 500
-  warning:     "#f59e0b",           // amber 500
-  danger:      "#ef4444",           // red 500
+// ── Design tokens & Themes ────────────────────────────────────
+const THEMES = {
+  navy: {
+    bg: "linear-gradient(165deg, #070c14 0%, #03060a 100%)",
+    bgSurf: "rgba(255,255,255,0.025)",
+    bgSurf2: "rgba(255,255,255,0.055)",
+    border: "rgba(255,255,255,0.06)",
+    borderAcc: "rgba(99,102,241,0.3)",
+    textPrimary: "#f1f5f9",
+    textSec: "#94a3b8",
+    textMuted: "#475569",
+    accent: "#6366f1",
+    accentLight: "#a5b4fc",
+    accentGlow: "rgba(99,102,241,0.12)",
+    success: "#10b981",
+    warning: "#f59e0b",
+    danger: "#ef4444",
+    name: "Calming Navy"
+  },
+  cyberpunk: {
+    bg: "linear-gradient(165deg, #14051a 0%, #09020d 100%)",
+    bgSurf: "rgba(255,255,255,0.03)",
+    bgSurf2: "rgba(255,255,255,0.06)",
+    border: "rgba(217,70,239,0.15)",
+    borderAcc: "rgba(217,70,239,0.4)",
+    textPrimary: "#fae8ff",
+    textSec: "#e879f9",
+    textMuted: "#701a75",
+    accent: "#d946ef",
+    accentLight: "#f472b6",
+    accentGlow: "rgba(217,70,239,0.14)",
+    success: "#10b981",
+    warning: "#fbbf24",
+    danger: "#ef4444",
+    name: "Cyberpunk Pink"
+  },
+  forest: {
+    bg: "linear-gradient(165deg, #04120c 0%, #010805 100%)",
+    bgSurf: "rgba(255,255,255,0.02)",
+    bgSurf2: "rgba(255,255,255,0.05)",
+    border: "rgba(16,185,129,0.12)",
+    borderAcc: "rgba(16,185,129,0.35)",
+    textPrimary: "#ecfdf5",
+    textSec: "#34d399",
+    textMuted: "#065f46",
+    accent: "#10b981",
+    accentLight: "#34d399",
+    accentGlow: "rgba(16,185,129,0.1)",
+    success: "#34d399",
+    warning: "#f59e0b",
+    danger: "#f87171",
+    name: "Emerald Forest"
+  },
+  amber: {
+    bg: "linear-gradient(165deg, #180902 0%, #0c0401 100%)",
+    bgSurf: "rgba(255,255,255,0.02)",
+    bgSurf2: "rgba(255,255,255,0.055)",
+    border: "rgba(245,158,11,0.15)",
+    borderAcc: "rgba(245,158,11,0.4)",
+    textPrimary: "#fef3c7",
+    textSec: "#fbbf24",
+    textMuted: "#78350f",
+    accent: "#f59e0b",
+    accentLight: "#fbbf24",
+    accentGlow: "rgba(245,158,11,0.12)",
+    success: "#10b981",
+    warning: "#fbbf24",
+    danger: "#f87171",
+    name: "Warm Amber"
+  }
 };
 
 const NOTE_ACCENTS  = ["#818cf8", "#34d399", "#fbbf24", "#38bdf8", "#e879f9", "#fb923c", "#a3e635", "#f472b6"];
@@ -126,6 +180,9 @@ const playSound = (type: "complete" | "levelup" | "finish_pomodoro" | "click") =
 //  WIDGET
 // ═════════════════════════════════════════════════════════════
 export default function Widget() {
+  const [currentTheme, setCurrentTheme] = useState<keyof typeof THEMES>("navy");
+  const C = THEMES[currentTheme] || THEMES.navy;
+
   const [data,        setData]        = useState<WidgetData|null>(null);
   const [captures,    setCaptures]    = useState<Task[]>([]);
   const [motivations, setMotivs]      = useState<Motivation[]>([]);
@@ -236,8 +293,17 @@ export default function Widget() {
       setStats(st);
     } catch {}
   };
+  const fetchTheme = async () => {
+    try {
+      const t = await invoke<string>("get_theme");
+      if (t in THEMES) {
+        setCurrentTheme(t as any);
+      }
+    } catch {}
+  };
 
   useEffect(() => {
+    fetchTheme();
     fetchData();
     fetchMotivs();
     fetchHabits();
@@ -440,7 +506,7 @@ export default function Widget() {
       width: "100%", height: "100%",
       display: "flex", flexDirection: "column",
       borderRadius: "24px", overflow: "hidden",
-      background: `linear-gradient(165deg, #070c14 0%, #03060a 100%)`,
+      background: C.bg,
       border: `1.5px solid ${borderCol}`,
       boxShadow: `0 24px 80px rgba(0,0,0,0.7), 0 4px 24px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.04), ${outerGlow}`,
       fontFamily: "'Segoe UI Variable','Segoe UI',-apple-system,sans-serif",
@@ -526,17 +592,47 @@ export default function Widget() {
             <div style={{
               height: "100%", width: `${xpPercentage}%`,
               borderRadius: "99px",
-              background: `linear-gradient(90deg, #6366f1, #a855f7)`,
-              boxShadow: `0 0 10px rgba(99,102,241,0.5)`,
+              background: `linear-gradient(90deg, ${C.accent}, ${C.accentLight})`,
+              boxShadow: `0 0 10px rgba(${rgb(C.accent)},0.5)`,
               transition: "width 0.5s ease",
             }}/>
           </div>
         </div>
 
-        {/* Pin & Focus Mode controls */}
-        <div style={{ display: "flex", gap: "6px", marginTop: "12px", justifyContent: "flex-end" }} onMouseDown={e => e.stopPropagation()}>
-          <PinBtn pinned={isPinned} onClick={handlePin} />
-          <FocusBtn active={focusMode} onClick={handleFocus} />
+        {/* Theme dots & controls */}
+        <div style={{ display: "flex", gap: "10px", marginTop: "12px", justifyContent: "space-between", alignItems: "center" }} onMouseDown={e => e.stopPropagation()}>
+          {/* Theme selection dots */}
+          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+            {(Object.keys(THEMES) as Array<keyof typeof THEMES>).map((t) => {
+              const active = currentTheme === t;
+              const dotColors = { navy: "#6366f1", cyberpunk: "#d946ef", forest: "#10b981", amber: "#f59e0b" };
+              return (
+                <button
+                  key={t}
+                  onClick={async () => {
+                    playSound("click");
+                    setCurrentTheme(t);
+                    try { await invoke("set_theme", { theme: t }); } catch {}
+                  }}
+                  style={{
+                    width: "12px", height: "12px", borderRadius: "50%",
+                    background: dotColors[t],
+                    border: active ? "1.5px solid #ffffff" : "1px solid transparent",
+                    cursor: "pointer", padding: 0,
+                    boxShadow: active ? `0 0 8px ${dotColors[t]}` : "none",
+                    transition: "transform 0.2s",
+                    transform: active ? "scale(1.2)" : "scale(1)",
+                  }}
+                  title={`Ubah tema ke ${THEMES[t].name}`}
+                />
+              );
+            })}
+          </div>
+
+          <div style={{ display: "flex", gap: "6px" }}>
+            <PinBtn pinned={isPinned} onClick={handlePin} />
+            <FocusBtn active={focusMode} onClick={handleFocus} />
+          </div>
         </div>
       </div>
 
