@@ -716,7 +716,7 @@ export default function Widget() {
   };
 
   // ── Computed stats details ──────────────────────────────────
-  const tasksList = data?.tasks || [];
+  const tasksList = captures.filter((c) => c.cap_type === "task");
   const notes     = captures.filter((c) => c.cap_type === "note");
   const pending   = tasksList.filter((t) => !t.completed);
   const pendingSorted = [...pending].sort((a, b) => {
@@ -1083,10 +1083,22 @@ export default function Widget() {
         {/* ── TUGAS ──────────────────────────────────────── */}
         {tab === "tasks" && (
           <div>
+            {tasksList.length > 0 && (
+              <div style={{ padding: "0 4px 10px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: C.textSec, fontWeight: 700, marginBottom: "4px" }}>
+                  <span>PROGRES HARI INI</span>
+                  <span>{Math.round((done.length / tasksList.length) * 100)}%</span>
+                </div>
+                <div style={{ height: "4px", background: "rgba(255,255,255,0.06)", borderRadius: "2px", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${(done.length / tasksList.length) * 100}%`, background: C.success, transition: "width 0.4s ease-out" }} />
+                </div>
+              </div>
+            )}
+
             {tasksList.length === 0 && !addTask && <EmptyState icon="✅" title="Selesai Semua!" sub='Ketuk "+ Tambah Tugas" dan dapatkan +10 XP tiap penyelesaian!' />}
 
             {pending.length > 0 && <SLabel text={`TUGAS AKTIF (+10 XP)  ·  ${pending.length}`} />}
-            {pendingSorted.map(t => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDel={delCapture} />)}
+            {pendingSorted.map(t => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDel={delCapture} onFocus={() => { if(!focusMode) handleFocus(); }} />)}
 
             {done.length > 0 && <SLabel text={`SELESAI ✓  ·  ${done.length}`} />}
             {done.map(t => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDel={delCapture} />)}
@@ -1490,8 +1502,8 @@ function AddRowBtn({ label, onClick }: { label: string; onClick: () => void }) {
   );
 }
 
-function TaskRow({ task, onToggle, onDel }:
-  { task: { id: number; text: string; completed: boolean }; onToggle: (id: number) => void; onDel: (id: number) => void }) {
+function TaskRow({ task, onToggle, onDel, onFocus }:
+  { task: { id: number; text: string; completed: boolean }; onToggle: (id: number) => void; onDel: (id: number) => void; onFocus?: (text: string) => void }) {
   const [hov, setHov] = useState(false);
   const priority = getTaskPriority(task.text);
 
@@ -1536,10 +1548,14 @@ function TaskRow({ task, onToggle, onDel }:
           color: task.completed ? "#334155" : "#e2e8f0",
           textDecoration: task.completed ? "line-through" : "none",
           transition: "color 0.2s",
-        }}>{task.text}</span>
+        }}>
+          {task.text.split(/(#\w+)/g).map((part, i) => 
+            part.startsWith("#") ? <span key={i} style={{ color: "#a5b4fc", fontWeight: 600, background: "rgba(99,102,241,0.15)", padding: "1px 4px", borderRadius: "4px", fontSize: "11px", margin: "0 2px" }}>{part}</span> : part
+          )}
+        </span>
         
         {!task.completed && (
-          <div style={{ display: "flex" }}>
+          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
             <span style={{
               fontSize: "8px", fontWeight: 700, padding: "1px 5px", borderRadius: "4px",
               background: badgeStyle.bg, color: badgeStyle.text, border: `1px solid ${badgeStyle.border}`,
@@ -1547,6 +1563,15 @@ function TaskRow({ task, onToggle, onDel }:
             }}>
               {badgeStyle.label}
             </span>
+            {onFocus && hov && (
+              <button onClick={(e) => { e.stopPropagation(); onFocus(task.text); }} style={{
+                background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)",
+                color: "#a5b4fc", fontSize: "9px", fontWeight: 700, padding: "1px 6px", borderRadius: "4px",
+                cursor: "pointer", transition: "all 0.2s"
+              }}>
+                ▶ FOKUS
+              </button>
+            )}
           </div>
         )}
       </div>
