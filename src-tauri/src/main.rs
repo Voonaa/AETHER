@@ -60,7 +60,13 @@ fn main() {
             commands::toggle_task_completion,
             commands::get_widget_data,
             commands::toggle_focus_mode,
-            commands::show_palette
+            commands::show_palette,
+            commands::save_widget_capture,
+            commands::delete_capture,
+            commands::get_motivations,
+            commands::add_motivation,
+            commands::update_motivation,
+            commands::delete_motivation
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

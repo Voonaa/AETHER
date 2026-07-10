@@ -315,3 +315,101 @@ pub fn show_palette(app: tauri::AppHandle) -> Result<(), String> {
     }
     Ok(())
 }
+
+// ── Direct widget capture (no palette needed) ─────────────────
+#[tauri::command]
+pub fn save_widget_capture(text: String, cap_type: String, state: State<'_, DbState>) -> Result<(), String> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Err("Cannot save empty capture".to_string());
+    }
+    let ct = if cap_type == "task" { "task" } else { "note" };
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO captures (text, type) VALUES (?1, ?2)",
+        [trimmed, ct],
+    ).map_err(|e| e.to_string())?;
+    println!("Widget capture saved: [{}] {}", ct, trimmed);
+    Ok(())
+}
+
+// ── Delete capture ─────────────────────────────────────────────
+#[tauri::command]
+pub fn delete_capture(id: i64, state: State<'_, DbState>) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM captures WHERE id = ?1", [id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+// ── Motivations CRUD ───────────────────────────────────────────
+#[derive(serde::Serialize, Clone)]
+pub struct Motivation {
+    pub id: i64,
+    pub text: String,
+    pub author: String,
+}
+
+#[tauri::command]
+pub fn get_motivations(state: State<'_, DbState>) -> Result<Vec<Motivation>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare(
+        "SELECT id, text, author FROM motivations ORDER BY id ASC"
+    ).map_err(|e| e.to_string())?;
+    let rows = stmt.query_map([], |row| {
+        Ok(Motivation {
+            id: row.get(0)?,
+            text: row.get(1)?,
+            author: row.get(2)?,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    let mut motivations = Vec::new();
+    for row in rows {
+        if let Ok(m) = row { motivations.push(m); }
+    }
+    Ok(motivations)
+}
+
+#[tauri::command]
+pub fn add_motivation(text: String, author: String, state: State<'_, DbState>) -> Result<i64, String> {
+    let trimmed = text.trim().to_string();
+    let author_trimmed = if author.trim().is_empty() { "Anonim".to_string() } else { author.trim().to_string() };
+    if trimmed.is_empty() {
+        return Err("Motivation text cannot be empty".to_string());
+    }
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO motivations (text, author) VALUES (?1, ?2)",
+        [&trimmed, &author_trimmed],
+    ).map_err(|e| e.to_string())?;
+    let id = conn.last_insert_rowid();
+    println!("Added motivation id={}: {} — {}", id, trimmed, author_trimmed);
+    Ok(id)
+}
+
+#[tauri::command]
+pub fn update_motivation(id: i64, text: String, author: String, state: State<'_, DbState>) -> Result<(), String> {
+    let trimmed = text.trim().to_string();
+    let author_trimmed = if author.trim().is_empty() { "Anonim".to_string() } else { author.trim().to_string() };
+    if trimmed.is_empty() {
+        return Err("Motivation text cannot be empty".to_string());
+    }
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE motivations SET text = ?1, author = ?2 WHERE id = ?3",
+        rusqlite::params![trimmed, author_trimmed, id],
+    ).map_err(|e| e.to_string())?;
+    println!("Updated motivation id={}", id);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_motivation(id: i64, state: State<'_, DbState>) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM motivations WHERE id = ?1", [id])
+        .map_err(|e| e.to_string())?;
+    println!("Deleted motivation id={}", id);
+    Ok(())
+}
+
