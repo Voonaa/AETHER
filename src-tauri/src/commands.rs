@@ -86,8 +86,25 @@ pub struct SearchResult {
 #[tauri::command]
 pub fn search_captures(query: String, state: State<'_, DbState>) -> Result<Vec<SearchResult>, String> {
     let trimmed = query.trim();
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+
     if trimmed.is_empty() {
-        return Ok(Vec::new());
+        let mut stmt = conn.prepare("SELECT id, text, type, completed FROM captures ORDER BY id DESC LIMIT 50").map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], |row| {
+            Ok(SearchResult {
+                id: row.get(0)?,
+                text: row.get(1)?,
+                cap_type: row.get(2)?,
+                completed: row.get::<_, i32>(3)? != 0,
+            })
+        }).map_err(|e| e.to_string())?;
+        let mut results = Vec::new();
+        for row in rows {
+            if let Ok(item) = row {
+                results.push(item);
+            }
+        }
+        return Ok(results);
     }
 
     let (is_todo_filter, search_term) = if trimmed.to_lowercase() == "/todo" {
@@ -98,7 +115,6 @@ pub fn search_captures(query: String, state: State<'_, DbState>) -> Result<Vec<S
         (false, trimmed)
     };
 
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
     let mut results = Vec::new();
 
     if is_todo_filter {
