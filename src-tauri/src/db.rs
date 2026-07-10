@@ -89,6 +89,16 @@ pub fn init_db(app_data_dir: &Path) -> Result<Connection, String> {
         )", [],
     ).map_err(|e| e.to_string())?;
 
+    // ── moods table ───────────────────────────────────────────
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS moods (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mood TEXT NOT NULL,
+            date TEXT NOT NULL UNIQUE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )", [],
+    ).map_err(|e| e.to_string())?;
+
     // ── motivations table ─────────────────────────────────────
     conn.execute(
         "CREATE TABLE IF NOT EXISTS motivations (

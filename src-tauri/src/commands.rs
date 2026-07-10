@@ -598,3 +598,63 @@ pub fn set_theme(theme: String, state: State<'_, DbState>) -> Result<(), String>
     Ok(())
 }
 
+// ── Daily Mood Check-in commands ──────────────────────────────
+
+#[derive(serde::Serialize)]
+pub struct MoodEntry {
+    pub id: i64,
+    pub mood: String,
+    pub date: String,
+}
+
+#[tauri::command]
+pub fn record_mood(mood: String, state: State<'_, DbState>) -> Result<UserStats, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let today: String = conn.query_row("SELECT date('now', 'localtime')", [], |r| r.get(0)).map_err(|e| e.to_string())?;
+
+    let exists: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM moods WHERE date = ?1",
+        [&today],
+        |r| r.get(0)
+    ).unwrap_or(0);
+
+    if exists > 0 {
+        conn.execute(
+            "UPDATE moods SET mood = ?1 WHERE date = ?2",
+            [mood, today]
+        ).map_err(|e| e.to_string())?;
+        drop(conn);
+        get_user_stats(state)
+    } else {
+        conn.execute(
+            "INSERT INTO moods (mood, date) VALUES (?1, ?2)",
+            [mood, today]
+        ).map_err(|e| e.to_string())?;
+        drop(conn);
+        add_xp_internal(10, state)
+    }
+}
+
+#[tauri::command]
+pub fn get_mood_history(state: State<'_, DbState>) -> Result<Vec<MoodEntry>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare("SELECT id, mood, date FROM moods ORDER BY date DESC LIMIT 7")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt.query_map([], |row| {
+        Ok(MoodEntry {
+            id: row.get(0)?,
+            mood: row.get(1)?,
+            date: row.get(2)?,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    let mut history = Vec::new();
+    for r in rows {
+        if let Ok(entry) = r {
+            history.push(entry);
+        }
+    }
+    history.reverse();
+    Ok(history)
+}
+

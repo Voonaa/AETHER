@@ -8,6 +8,7 @@ interface WidgetData { date: string; tasks: Task[]; last_note: string|null; focu
 interface Motivation { id: number; text: string; author: string; }
 interface Habit      { id: number; text: string; streak: number; last_completed: string|null; }
 interface UserStats  { xp: number; level: number; }
+interface MoodEntry  { id: number; mood: string; date: string; }
 
 // ── Design tokens & Themes ────────────────────────────────────
 const THEMES = {
@@ -218,6 +219,148 @@ export default function Widget() {
   const [xpPop,       setXpPop]       = useState<{ show: boolean; amount: string }>({ show: false, amount: "" });
   const [lvlUpShow,   setLvlUpShow]   = useState(false);
 
+  // Ambient Soundscape state & refs
+  const [ambientType, setAmbientType] = useState<"rain" | "wind" | "brown" | "off">("off");
+  const [ambientVol, setAmbientVol]   = useState(0.25);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const noiseSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const lfoRef = useRef<OscillatorNode | null>(null);
+  const filterRef = useRef<BiquadFilterNode | null>(null);
+
+  // Daily Mood Tracker state
+  const [moodHistory, setMoodHistory] = useState<MoodEntry[]>([]);
+  const [todayMood, setTodayMood]     = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!focusMode) {
+      setAmbientType("off");
+    }
+  }, [focusMode]);
+
+  useEffect(() => {
+    const stopAudio = () => {
+      try {
+        if (noiseSourceRef.current) {
+          noiseSourceRef.current.stop();
+          noiseSourceRef.current.disconnect();
+          noiseSourceRef.current = null;
+        }
+        if (lfoRef.current) {
+          lfoRef.current.stop();
+          lfoRef.current.disconnect();
+          lfoRef.current = null;
+        }
+        if (filterRef.current) {
+          filterRef.current.disconnect();
+          filterRef.current = null;
+        }
+        if (gainNodeRef.current) {
+          gainNodeRef.current.disconnect();
+          gainNodeRef.current = null;
+        }
+      } catch (e) {
+        console.error("Stop audio error:", e);
+      }
+    };
+
+    stopAudio();
+
+    if (ambientType === "off" || !focusMode) return;
+
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+        audioCtxRef.current = new AudioContextClass();
+      }
+      const ctx = audioCtxRef.current;
+
+      if (ctx.state === "suspended") {
+        ctx.resume();
+      }
+
+      const bufferSize = ctx.sampleRate * 2;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+
+      if (ambientType === "brown") {
+        let lastOut = 0.0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          data[i] = (lastOut + (0.02 * white)) / 1.02;
+          lastOut = data[i];
+          data[i] *= 3.5;
+        }
+      } else {
+        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          b0 = 0.99886 * b0 + white * 0.0555179;
+          b1 = 0.99332 * b1 + white * 0.0750759;
+          b2 = 0.96900 * b2 + white * 0.1538520;
+          b3 = 0.86650 * b3 + white * 0.3104856;
+          b4 = 0.55000 * b4 + white * 0.5329522;
+          b5 = -0.7616 * b5 - white * 0.0168980;
+          data[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 * 0.5362;
+          data[i] *= 0.11;
+          b6 = white * 0.115926;
+        }
+      }
+
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+      noiseSourceRef.current = source;
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(ambientVol, ctx.currentTime);
+      gainNodeRef.current = gain;
+
+      const filter = ctx.createBiquadFilter();
+      filterRef.current = filter;
+
+      if (ambientType === "rain") {
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(950, ctx.currentTime);
+        source.connect(filter);
+        filter.connect(gain);
+      } else if (ambientType === "wind") {
+        filter.type = "bandpass";
+        filter.Q.setValueAtTime(2.5, ctx.currentTime);
+        filter.frequency.setValueAtTime(450, ctx.currentTime);
+
+        const lfo = ctx.createOscillator();
+        lfo.type = "sine";
+        lfo.frequency.setValueAtTime(0.06, ctx.currentTime);
+        lfoRef.current = lfo;
+
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.setValueAtTime(250, ctx.currentTime);
+
+        lfo.connect(lfoGain);
+        lfoGain.connect(filter.frequency);
+
+        source.connect(filter);
+        filter.connect(gain);
+        lfo.start();
+      } else if (ambientType === "brown") {
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(350, ctx.currentTime);
+        source.connect(filter);
+        filter.connect(gain);
+      }
+
+      gain.connect(ctx.destination);
+      source.start();
+    } catch (e) {
+      console.error("Synthesizer error:", e);
+    }
+
+    return () => {
+      stopAudio();
+    };
+  }, [ambientType, ambientVol, focusMode]);
+
   const taskRef  = useRef<HTMLInputElement>(null);
   const habitRef = useRef<HTMLInputElement>(null);
   const noteRef  = useRef<HTMLTextAreaElement>(null);
@@ -301,6 +444,25 @@ export default function Widget() {
       }
     } catch {}
   };
+  const fetchMoods = async () => {
+    try {
+      const history = await invoke<MoodEntry[]>("get_mood_history");
+      setMoodHistory(history);
+      const todayStr = new Date().toLocaleDateString("sv-SE");
+      const foundToday = history.find(m => m.date === todayStr);
+      if (foundToday) setTodayMood(foundToday.mood);
+      else            setTodayMood(null);
+    } catch {}
+  };
+  const handleRecordMood = async (mood: string) => {
+    try {
+      const nextStats = await invoke<UserStats>("record_mood", { mood });
+      const todayStr = new Date().toLocaleDateString("sv-SE");
+      const alreadyChecked = moodHistory.some(m => m.date === todayStr);
+      handleXPDelta(alreadyChecked ? 0 : 10, nextStats);
+      await fetchMoods();
+    } catch {}
+  };
 
   useEffect(() => {
     fetchTheme();
@@ -308,6 +470,7 @@ export default function Widget() {
     fetchMotivs();
     fetchHabits();
     fetchStats();
+    fetchMoods();
     const iv = setInterval(() => {
       fetchData();
       fetchHabits();
@@ -688,6 +851,57 @@ export default function Widget() {
               transition: "width 1s linear",
             }}/>
           </div>
+
+          {/* Ambient Soundscapes */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%", marginTop: "4px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: "9px", color: C.textSec, fontWeight: 700, letterSpacing: "0.05em" }}>AMBIENT SOUNDSCAPE</span>
+              <span style={{ fontSize: "9px", color: C.textMuted }}>Vol: {Math.round(ambientVol * 125)}%</span>
+            </div>
+            
+            <div style={{ display: "flex", gap: "3px", width: "100%" }}>
+              {[
+                { id: "off", label: "🔇 Mute" },
+                { id: "rain", label: "🌧️ Hujan" },
+                { id: "wind", label: "🍃 Angin" },
+                { id: "brown", label: "🟫 Brown" }
+              ].map((s) => {
+                const isS = ambientType === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => { playSound("click"); setAmbientType(s.id as any); }}
+                    style={{
+                      flex: 1, padding: "4px 0", borderRadius: "6px", fontSize: "10px", fontWeight: 600,
+                      background: isS ? `rgba(${rgb(C.accent)},0.2)` : "rgba(255,255,255,0.02)",
+                      color: isS ? C.accentLight : C.textSec,
+                      border: isS ? `1px solid rgba(${rgb(C.accent)},0.35)` : "1px solid transparent",
+                      cursor: "pointer", transition: "all 0.15s",
+                    }}
+                  >
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {ambientType !== "off" && (
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", marginTop: "2px" }}>
+                <span style={{ fontSize: "10px" }}>🔈</span>
+                <input
+                  type="range" min="0" max="0.8" step="0.05"
+                  value={ambientVol}
+                  onChange={(e) => setAmbientVol(parseFloat(e.target.value))}
+                  style={{
+                    flex: 1, height: "3px", borderRadius: "99px",
+                    accentColor: C.accent, background: "rgba(255,255,255,0.1)",
+                    outline: "none", cursor: "pointer",
+                  }}
+                />
+                <span style={{ fontSize: "10px" }}>🔊</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -855,6 +1069,116 @@ export default function Widget() {
         {/* ── JURNAL ─────────────────────────────────────── */}
         {tab === "notes" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "7px", paddingTop: "2px" }}>
+            {/* Mood Check-in Card */}
+            <div style={{
+              padding: "12px 14px", borderRadius: "14px",
+              background: "rgba(255,255,255,0.02)",
+              border: `1px solid ${C.border}`,
+              marginBottom: "4px", display: "flex", flexDirection: "column", gap: "10px"
+            }}>
+              {!todayMood ? (
+                <>
+                  <span style={{ fontSize: "10px", fontWeight: 700, color: C.accentLight, letterSpacing: "0.05em" }}>
+                    BAGAIMANA MOOD-MU HARI INI? (+10 XP)
+                  </span>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: "6px" }}>
+                    {[
+                      { id: "calm", emoji: "😊", label: "Calm" },
+                      { id: "happy", emoji: "😄", label: "Happy" },
+                      { id: "neutral", emoji: "😐", label: "Neutral" },
+                      { id: "tired", emoji: "😴", label: "Tired" },
+                      { id: "anxious", emoji: "😔", label: "Anxious" }
+                    ].map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => handleRecordMood(m.id)}
+                        style={{
+                          flex: 1, padding: "8px 0", borderRadius: "8px",
+                          background: "rgba(255,255,255,0.03)", border: "1px solid transparent",
+                          fontSize: "18px", cursor: "pointer", display: "flex", flexDirection: "column",
+                          alignItems: "center", gap: "4px", transition: "transform 0.2s"
+                        }}
+                        title={m.label}
+                        onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.15)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                      >
+                        <span>{m.emoji}</span>
+                        <span style={{ fontSize: "8.5px", color: C.textSec }}>{m.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: C.textPrimary }}>
+                      Mood Hari Ini: &nbsp;
+                      {
+                        {
+                          calm: "😊 Calm",
+                          happy: "😄 Happy",
+                          neutral: "😐 Neutral",
+                          tired: "😴 Tired",
+                          anxious: "😔 Anxious"
+                        }[todayMood] || todayMood
+                      }
+                    </span>
+                    <button
+                      onClick={() => handleRecordMood("")}
+                      style={{
+                        background: "none", border: "none", fontSize: "10px", color: C.accentLight,
+                        cursor: "pointer", textDecoration: "underline"
+                      }}
+                    >
+                      Ubah
+                    </button>
+                  </div>
+
+                  {/* 7-Day History Visualization */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "5px", borderTop: "1px solid rgba(255,255,255,0.04)", paddingTop: "8px" }}>
+                    <span style={{ fontSize: "9px", color: C.textSec, fontWeight: 700, letterSpacing: "0.08em" }}>RIWAYAT MOOD (7 HARI TERAKHIR)</span>
+                    <div style={{ display: "flex", gap: "5px" }}>
+                      {moodHistory.map((h, i) => {
+                        const colors = { calm: "#3b82f6", happy: "#10b981", neutral: "#94a3b8", tired: "#8b5cf6", anxious: "#f59e0b" };
+                        const color = (colors as any)[h.mood] || "#ffffff";
+                        const emojis = { calm: "😊", happy: "😄", neutral: "😐", tired: "😴", anxious: "😔" };
+                        const emoji = (emojis as any)[h.mood] || "❓";
+                        const dateObj = new Date(h.date);
+                        const dayLabel = dateObj.toLocaleDateString("id-ID", { weekday: "short" });
+
+                        return (
+                          <div
+                            key={h.id || i}
+                            style={{
+                              flex: 1, padding: "5px 2px", borderRadius: "8px",
+                              background: "rgba(255,255,255,0.02)", border: `1px solid rgba(${rgb(color)},0.18)`,
+                              display: "flex", flexDirection: "column", alignItems: "center", gap: "2px"
+                            }}
+                          >
+                            <span style={{ fontSize: "11px" }}>{emoji}</span>
+                            <span style={{ fontSize: "8px", color: C.textMuted, fontWeight: 700 }}>{dayLabel}</span>
+                          </div>
+                        );
+                      })}
+                      {Array.from({ length: Math.max(0, 7 - moodHistory.length) }).map((_, idx) => (
+                        <div
+                          key={`empty-${idx}`}
+                          style={{
+                            flex: 1, padding: "5px 2px", borderRadius: "8px",
+                            background: "rgba(255,255,255,0.01)", border: `1px dashed rgba(255,255,255,0.04)`,
+                            display: "flex", flexDirection: "column", alignItems: "center", gap: "2px"
+                          }}
+                        >
+                          <span style={{ fontSize: "11px", opacity: 0.15 }}>⚪</span>
+                          <span style={{ fontSize: "8px", color: C.textMuted, opacity: 0.3 }}>-</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
             {notes.length === 0 && !addNote && <EmptyState icon="📝" title="Jurnal Harian" sub='Tulis refleksi hari ini, ide menarik, atau rasa syukur untuk menjaga pikiranmu tetap jernih!' />}
 
             {notes.map((n, i) => (
