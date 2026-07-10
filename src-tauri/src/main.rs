@@ -61,6 +61,7 @@ fn main() {
             commands::get_widget_data,
             commands::toggle_focus_mode,
             commands::show_palette,
+            commands::set_widget_pin,
             commands::save_widget_capture,
             commands::delete_capture,
             commands::get_motivations,

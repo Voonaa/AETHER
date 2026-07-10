@@ -316,6 +316,16 @@ pub fn show_palette(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+// ── Set widget always-on-top (pin) via Rust ────────────────────
+#[tauri::command]
+pub fn set_widget_pin(pinned: bool, app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(widget) = app.get_webview_window("widget") {
+        widget.set_always_on_top(pinned).map_err(|e| e.to_string())?;
+        println!("Widget pin set to: {}", pinned);
+    }
+    Ok(())
+}
+
 // ── Direct widget capture (no palette needed) ─────────────────
 #[tauri::command]
 pub fn save_widget_capture(text: String, cap_type: String, state: State<'_, DbState>) -> Result<(), String> {
