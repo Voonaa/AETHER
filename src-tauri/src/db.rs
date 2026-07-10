@@ -66,6 +66,25 @@ pub fn init_db(app_data_dir: &Path) -> Result<Connection, String> {
         "INSERT OR IGNORE INTO settings (key, value) VALUES ('focus_mode', 'false')", [],
     ).map_err(|e| e.to_string())?;
 
+    conn.execute(
+        "INSERT OR IGNORE INTO settings (key, value) VALUES ('user_xp', '0')", [],
+    ).map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "INSERT OR IGNORE INTO settings (key, value) VALUES ('user_level', '1')", [],
+    ).map_err(|e| e.to_string())?;
+
+    // ── habits table ──────────────────────────────────────────
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS habits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            text TEXT NOT NULL,
+            streak INTEGER NOT NULL DEFAULT 0,
+            last_completed TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )", [],
+    ).map_err(|e| e.to_string())?;
+
     // ── motivations table ─────────────────────────────────────
     conn.execute(
         "CREATE TABLE IF NOT EXISTS motivations (

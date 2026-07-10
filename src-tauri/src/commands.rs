@@ -170,8 +170,47 @@ pub fn search_captures(query: String, state: State<'_, DbState>) -> Result<Vec<S
     Ok(results)
 }
 
+#[derive(serde::Serialize, Clone, Debug)]
+pub struct UserStats {
+    pub xp: i64,
+    pub level: i64,
+}
+
+pub fn add_xp_internal(amount: i64, state: State<'_, DbState>) -> Result<UserStats, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    
+    let xp_str: String = conn.query_row("SELECT value FROM settings WHERE key = 'user_xp'", [], |r| r.get(0))
+        .unwrap_or_else(|_| "0".to_string());
+    let lvl_str: String = conn.query_row("SELECT value FROM settings WHERE key = 'user_level'", [], |r| r.get(0))
+        .unwrap_or_else(|_| "1".to_string());
+
+    let mut xp: i64 = xp_str.parse().unwrap_or(0);
+    let mut level: i64 = lvl_str.parse().unwrap_or(1);
+
+    xp += amount;
+    if xp < 0 {
+        xp = 0;
+    }
+
+    // Level up logic: Level L requires L * 100 XP
+    loop {
+        let req = level * 100;
+        if xp >= req {
+            xp -= req;
+            level += 1;
+        } else {
+            break;
+        }
+    }
+
+    conn.execute("UPDATE settings SET value = ?1 WHERE key = 'user_xp'", [xp.to_string()]).map_err(|e| e.to_string())?;
+    conn.execute("UPDATE settings SET value = ?1 WHERE key = 'user_level'", [level.to_string()]).map_err(|e| e.to_string())?;
+
+    Ok(UserStats { xp, level })
+}
+
 #[tauri::command]
-pub fn toggle_task_completion(id: i64, state: State<'_, DbState>) -> Result<(), String> {
+pub fn toggle_task_completion(id: i64, state: State<'_, DbState>) -> Result<UserStats, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
         "UPDATE captures SET completed = 1 - completed WHERE id = ?1",
@@ -179,8 +218,16 @@ pub fn toggle_task_completion(id: i64, state: State<'_, DbState>) -> Result<(), 
     )
     .map_err(|e| e.to_string())?;
 
-    println!("Toggled task completion for ID: {}", id);
-    Ok(())
+    let completed: i32 = conn.query_row(
+        "SELECT completed FROM captures WHERE id = ?1",
+        [id],
+        |r| r.get(0)
+    ).map_err(|e| e.to_string())?;
+
+    let xp_change = if completed != 0 { 10 } else { -10 };
+    drop(conn);
+
+    add_xp_internal(xp_change, state)
 }
 
 #[derive(serde::Serialize)]
@@ -421,5 +468,117 @@ pub fn delete_motivation(id: i64, state: State<'_, DbState>) -> Result<(), Strin
         .map_err(|e| e.to_string())?;
     println!("Deleted motivation id={}", id);
     Ok(())
+}
+
+// ── Habits and Gamification commands ──────────────────────────
+
+#[derive(serde::Serialize)]
+pub struct Habit {
+    pub id: i64,
+    pub text: String,
+    pub streak: i64,
+    pub last_completed: Option<String>,
+}
+
+#[tauri::command]
+pub fn get_habits(state: State<'_, DbState>) -> Result<Vec<Habit>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare("SELECT id, text, streak, last_completed FROM habits ORDER BY id ASC")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt.query_map([], |row| {
+        Ok(Habit {
+            id: row.get(0)?,
+            text: row.get(1)?,
+            streak: row.get(2)?,
+            last_completed: row.get(3)?,
+        })
+    }).map_err(|e| e.to_string())?;
+    let mut habits = Vec::new();
+    for r in rows {
+        if let Ok(h) = r { habits.push(h); }
+    }
+    Ok(habits)
+}
+
+#[tauri::command]
+pub fn add_habit(text: String, state: State<'_, DbState>) -> Result<i64, String> {
+    let trimmed = text.trim().to_string();
+    if trimmed.is_empty() { return Err("Habit text cannot be empty".to_string()); }
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute("INSERT INTO habits (text, streak, last_completed) VALUES (?1, 0, NULL)", [&trimmed])
+        .map_err(|e| e.to_string())?;
+    Ok(conn.last_insert_rowid())
+}
+
+#[tauri::command]
+pub fn delete_habit(id: i64, state: State<'_, DbState>) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM habits WHERE id = ?1", [id]).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn toggle_habit_completion(id: i64, state: State<'_, DbState>) -> Result<UserStats, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let today: String = conn.query_row("SELECT date('now', 'localtime')", [], |r| r.get(0)).map_err(|e| e.to_string())?;
+    let yesterday: String = conn.query_row("SELECT date('now', '-1 day', 'localtime')", [], |r| r.get(0)).map_err(|e| e.to_string())?;
+
+    let (streak, last_completed): (i64, Option<String>) = conn.query_row(
+        "SELECT streak, last_completed FROM habits WHERE id = ?1",
+        [id],
+        |r| Ok((r.get(0)?, r.get(1)?))
+    ).map_err(|e| e.to_string())?;
+
+    let mut new_streak = streak;
+    let mut new_last_completed = None;
+    let mut xp_change = 0;
+
+    if let Some(ref date_str) = last_completed {
+        if date_str == &today {
+            new_last_completed = None;
+            if new_streak > 0 {
+                new_streak -= 1;
+            }
+            xp_change = -15;
+        } else {
+            new_last_completed = Some(today.clone());
+            if date_str == &yesterday {
+                new_streak += 1;
+            } else {
+                new_streak = 1;
+            }
+            xp_change = 15;
+        }
+    } else {
+        new_last_completed = Some(today.clone());
+        new_streak = 1;
+        xp_change = 15;
+    }
+
+    conn.execute(
+        "UPDATE habits SET streak = ?1, last_completed = ?2 WHERE id = ?3",
+        rusqlite::params![new_streak, new_last_completed, id]
+    ).map_err(|e| e.to_string())?;
+
+    drop(conn);
+    add_xp_internal(xp_change, state)
+}
+
+#[tauri::command]
+pub fn get_user_stats(state: State<'_, DbState>) -> Result<UserStats, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let xp_str: String = conn.query_row("SELECT value FROM settings WHERE key = 'user_xp'", [], |r| r.get(0))
+        .unwrap_or_else(|_| "0".to_string());
+    let lvl_str: String = conn.query_row("SELECT value FROM settings WHERE key = 'user_level'", [], |r| r.get(0))
+        .unwrap_or_else(|_| "1".to_string());
+    Ok(UserStats {
+        xp: xp_str.parse().unwrap_or(0),
+        level: lvl_str.parse().unwrap_or(1),
+    })
+}
+
+#[tauri::command]
+pub fn add_xp(amount: i64, state: State<'_, DbState>) -> Result<UserStats, String> {
+    add_xp_internal(amount, state)
 }
 

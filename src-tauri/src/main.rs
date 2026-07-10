@@ -67,7 +67,13 @@ fn main() {
             commands::get_motivations,
             commands::add_motivation,
             commands::update_motivation,
-            commands::delete_motivation
+            commands::delete_motivation,
+            commands::get_habits,
+            commands::add_habit,
+            commands::delete_habit,
+            commands::toggle_habit_completion,
+            commands::get_user_stats,
+            commands::add_xp
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
