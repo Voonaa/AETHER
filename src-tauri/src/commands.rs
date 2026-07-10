@@ -674,3 +674,84 @@ pub fn get_mood_history(state: State<'_, DbState>) -> Result<Vec<MoodEntry>, Str
     Ok(history)
 }
 
+// ── BACKUP / RESTORE ─────────────────────────────────────────
+use std::fs;
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct CaptureBackup { id: i64, text: String, cap_type: String, completed: i32 }
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct HabitBackup { id: i64, text: String, streak: i64, last_completed: Option<String> }
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct MotivationBackup { id: i64, text: String, author: String }
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct MoodBackup { id: i64, mood: String, date: String }
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct SettingBackup { key: String, value: String }
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct BackupData {
+    pub captures: Vec<CaptureBackup>,
+    pub habits: Vec<HabitBackup>,
+    pub motivations: Vec<MotivationBackup>,
+    pub moods: Vec<MoodBackup>,
+    pub settings: Vec<SettingBackup>,
+}
+
+#[tauri::command]
+pub fn export_backup(state: State<'_, DbState>) -> Result<String, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    
+    let captures: Vec<CaptureBackup> = conn.prepare("SELECT id, text, type, completed FROM captures").unwrap()
+        .query_map([], |r| Ok(CaptureBackup { id: r.get(0)?, text: r.get(1)?, cap_type: r.get(2)?, completed: r.get(3)? })).unwrap().flatten().collect();
+    let habits: Vec<HabitBackup> = conn.prepare("SELECT id, text, streak, last_completed FROM habits").unwrap()
+        .query_map([], |r| Ok(HabitBackup { id: r.get(0)?, text: r.get(1)?, streak: r.get(2)?, last_completed: r.get(3)? })).unwrap().flatten().collect();
+    let motivations: Vec<MotivationBackup> = conn.prepare("SELECT id, text, author FROM motivations").unwrap()
+        .query_map([], |r| Ok(MotivationBackup { id: r.get(0)?, text: r.get(1)?, author: r.get(2)? })).unwrap().flatten().collect();
+    let moods: Vec<MoodBackup> = conn.prepare("SELECT id, mood, date FROM moods").unwrap()
+        .query_map([], |r| Ok(MoodBackup { id: r.get(0)?, mood: r.get(1)?, date: r.get(2)? })).unwrap().flatten().collect();
+    let settings: Vec<SettingBackup> = conn.prepare("SELECT key, value FROM settings").unwrap()
+        .query_map([], |r| Ok(SettingBackup { key: r.get(0)?, value: r.get(1)? })).unwrap().flatten().collect();
+
+    let backup = BackupData { captures, habits, motivations, moods, settings };
+    let json = serde_json::to_string_pretty(&backup).map_err(|e| e.to_string())?;
+
+    let user_profile = std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\".to_string());
+    let desktop_path = format!("{}\\Desktop\\AetherBackup.json", user_profile);
+    fs::write(&desktop_path, json).map_err(|e| e.to_string())?;
+
+    Ok(desktop_path)
+}
+
+#[tauri::command]
+pub fn import_backup(state: State<'_, DbState>) -> Result<(), String> {
+    let user_profile = std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\".to_string());
+    let desktop_path = format!("{}\\Desktop\\AetherBackup.json", user_profile);
+    
+    let json = fs::read_to_string(&desktop_path).map_err(|e| e.to_string())?;
+    let backup: BackupData = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+    
+    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+    tx.execute_batch("DELETE FROM captures; DELETE FROM habits; DELETE FROM motivations; DELETE FROM moods; DELETE FROM settings;").map_err(|e| e.to_string())?;
+    
+    for c in backup.captures {
+        tx.execute("INSERT INTO captures (id, text, type, completed) VALUES (?1, ?2, ?3, ?4)", rusqlite::params![c.id, c.text, c.cap_type, c.completed]).ok();
+    }
+    for h in backup.habits {
+        tx.execute("INSERT INTO habits (id, text, streak, last_completed) VALUES (?1, ?2, ?3, ?4)", rusqlite::params![h.id, h.text, h.streak, h.last_completed]).ok();
+    }
+    for m in backup.motivations {
+        tx.execute("INSERT INTO motivations (id, text, author) VALUES (?1, ?2, ?3)", rusqlite::params![m.id, m.text, m.author]).ok();
+    }
+    for m in backup.moods {
+        tx.execute("INSERT INTO moods (id, mood, date) VALUES (?1, ?2, ?3)", rusqlite::params![m.id, m.mood, m.date]).ok();
+    }
+    for s in backup.settings {
+        tx.execute("INSERT INTO settings (key, value) VALUES (?1, ?2)", rusqlite::params![s.key, s.value]).ok();
+    }
+
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(())
+}
+

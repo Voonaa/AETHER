@@ -251,7 +251,7 @@ export default function Widget() {
   const [motivations, setMotivs]      = useState<Motivation[]>([]);
   const [habits,      setHabits]      = useState<Habit[]>([]);
   const [stats,       setStats]       = useState<UserStats>({ xp: 0, level: 1 });
-  const [tab,         setTab]         = useState<"tasks"|"habits"|"notes"|"motivasi">("tasks");
+  const [tab,         setTab]         = useState<"tasks"|"habits"|"notes"|"motivasi"|"stats">("tasks");
   const [focusMode,   setFocus]       = useState(false);
   const [isPinned,    setPin]         = useState(false);
   const [quoteIdx,    setQuoteIdx]    = useState(0);
@@ -282,13 +282,14 @@ export default function Widget() {
   const [lvlUpShow,   setLvlUpShow]   = useState(false);
 
   // Ambient Soundscape state & refs
-  const [ambientType, setAmbientType] = useState<"rain" | "wind" | "brown" | "off">("off");
+  const [ambientType, setAmbientType] = useState<"rain" | "wind" | "brown" | "lofi" | "off">("off");
   const [ambientVol, setAmbientVol]   = useState(0.25);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const noiseSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const lfoRef = useRef<OscillatorNode | null>(null);
   const filterRef = useRef<BiquadFilterNode | null>(null);
+  const lofiAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Daily Mood Tracker state
   const [moodHistory, setMoodHistory] = useState<MoodEntry[]>([]);
@@ -321,6 +322,9 @@ export default function Widget() {
           gainNodeRef.current.disconnect();
           gainNodeRef.current = null;
         }
+        if (lofiAudioRef.current) {
+          lofiAudioRef.current.pause();
+        }
       } catch (e) {
         console.error("Stop audio error:", e);
       }
@@ -329,6 +333,19 @@ export default function Widget() {
     stopAudio();
 
     if (ambientType === "off" || !focusMode) return;
+
+    if (ambientType === "lofi") {
+      let audio = lofiAudioRef.current;
+      if (!audio) {
+        audio = new Audio("https://streams.ilovemusic.de/iloveradio17.mp3");
+        audio.crossOrigin = "anonymous";
+        audio.loop = true;
+        lofiAudioRef.current = audio;
+      }
+      audio.volume = ambientVol;
+      audio.play().catch(e => console.error("Lofi play error:", e));
+      return;
+    }
 
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -368,7 +385,6 @@ export default function Widget() {
           b6 = white * 0.115926;
         }
       }
-
       const source = ctx.createBufferSource();
       source.buffer = buffer;
       source.loop = true;
@@ -421,7 +437,16 @@ export default function Widget() {
     return () => {
       stopAudio();
     };
-  }, [ambientType, ambientVol, focusMode]);
+  }, [ambientType, focusMode]);
+
+  useEffect(() => {
+    if (gainNodeRef.current && audioCtxRef.current) {
+      gainNodeRef.current.gain.setValueAtTime(ambientVol, audioCtxRef.current.currentTime);
+    }
+    if (lofiAudioRef.current) {
+      lofiAudioRef.current.volume = ambientVol;
+    }
+  }, [ambientVol]);
 
   const taskRef  = useRef<HTMLInputElement>(null);
   const habitRef = useRef<HTMLInputElement>(null);
@@ -976,30 +1001,18 @@ export default function Widget() {
               <span style={{ fontSize: "9px", color: C.textMuted }}>Vol: {Math.round(ambientVol * 125)}%</span>
             </div>
             
-            <div style={{ display: "flex", gap: "3px", width: "100%" }}>
-              {[
-                { id: "off", label: "🔇 Mute" },
-                { id: "rain", label: "🌧️ Hujan" },
-                { id: "wind", label: "🍃 Angin" },
-                { id: "brown", label: "🟫 Brown" }
-              ].map((s) => {
-                const isS = ambientType === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => { playSound("click"); setAmbientType(s.id as any); }}
-                    style={{
-                      flex: 1, padding: "4px 0", borderRadius: "6px", fontSize: "10px", fontWeight: 600,
-                      background: isS ? `rgba(${rgb(C.accent)},0.2)` : "rgba(255,255,255,0.02)",
-                      color: isS ? C.accentLight : C.textSec,
-                      border: isS ? `1px solid rgba(${rgb(C.accent)},0.35)` : "1px solid transparent",
-                      cursor: "pointer", transition: "all 0.15s",
-                    }}
-                  >
-                    {s.label}
-                  </button>
-                );
-              })}
+            <div style={{ display: "flex", gap: "6px", overflowX: "auto", paddingBottom: "5px", scrollbarWidth: "none" }}>
+              {["rain", "wind", "brown", "lofi", "off"].map((t) => (
+                <button key={t} onClick={() => setAmbientType(t as any)} style={{
+                  padding: "6px 12px", borderRadius: "20px", fontSize: "10px", fontWeight: 700,
+                  whiteSpace: "nowrap", cursor: "pointer", transition: "all 0.2s",
+                  border: ambientType === t ? `1px solid rgba(${rgb(C.accent)}, 0.4)` : "1px solid rgba(255,255,255,0.1)",
+                  background: ambientType === t ? `rgba(${rgb(C.accent)}, 0.15)` : "rgba(255,255,255,0.03)",
+                  color: ambientType === t ? C.accentLight : C.textSec
+                }}>
+                  {t === "rain" ? "🌧️ Hujan" : t === "wind" ? "🌬️ Angin" : t === "brown" ? "🍂 Brown" : t === "lofi" ? "🎵 Lo-Fi" : "Hening"}
+                </button>
+              ))}
             </div>
 
             {ambientType !== "off" && (
@@ -1055,7 +1068,8 @@ export default function Widget() {
           { id: "tasks", label: "Tugas", icon: "📋", count: pending.length },
           { id: "habits", label: "Habit", icon: "🔥", count: habits.length },
           { id: "notes", label: "Jurnal", icon: "📝", count: notes.length },
-          { id: "motivasi", label: "Inspirasi", icon: "✨", count: motivations.length }
+          { id: "motivasi", label: "Inspirasi", icon: "✨", count: motivations.length },
+          { id: "stats", label: "Stats", icon: "📊", count: 0 }
         ].map((t) => {
           const isAct = tab === t.id;
           return (

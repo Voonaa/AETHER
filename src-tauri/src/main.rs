@@ -77,7 +77,9 @@ fn main() {
             commands::get_theme,
             commands::set_theme,
             commands::record_mood,
-            commands::get_mood_history
+            commands::get_mood_history,
+            commands::export_backup,
+            commands::import_backup
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
