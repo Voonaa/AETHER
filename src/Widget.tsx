@@ -79,6 +79,57 @@ const THEMES = {
     warning: "#fbbf24",
     danger: "#f87171",
     name: "Warm Amber"
+  },
+  royal: {
+    bg: "linear-gradient(165deg, #0e0517 0%, #06020a 100%)",
+    bgSurf: "rgba(255,255,255,0.025)",
+    bgSurf2: "rgba(255,255,255,0.05)",
+    border: "rgba(168,85,247,0.15)",
+    borderAcc: "rgba(168,85,247,0.4)",
+    textPrimary: "#faf5ff",
+    textSec: "#c084fc",
+    textMuted: "#6b21a8",
+    accent: "#a855f7",
+    accentLight: "#d8b4fe",
+    accentGlow: "rgba(168,85,247,0.14)",
+    success: "#10b981",
+    warning: "#fbbf24",
+    danger: "#ef4444",
+    name: "Royal Amethyst"
+  },
+  ocean: {
+    bg: "linear-gradient(165deg, #021017 0%, #01060a 100%)",
+    bgSurf: "rgba(255,255,255,0.02)",
+    bgSurf2: "rgba(255,255,255,0.05)",
+    border: "rgba(14,165,233,0.12)",
+    borderAcc: "rgba(14,165,233,0.35)",
+    textPrimary: "#f0f9ff",
+    textSec: "#38bdf8",
+    textMuted: "#0369a1",
+    accent: "#0ea5e9",
+    accentLight: "#7dd3fc",
+    accentGlow: "rgba(14,165,233,0.12)",
+    success: "#34d399",
+    warning: "#f59e0b",
+    danger: "#f87171",
+    name: "Deep Ocean"
+  },
+  sunset: {
+    bg: "linear-gradient(165deg, #1a0808 0%, #0a0202 100%)",
+    bgSurf: "rgba(255,255,255,0.025)",
+    bgSurf2: "rgba(255,255,255,0.05)",
+    border: "rgba(244,63,94,0.15)",
+    borderAcc: "rgba(244,63,94,0.4)",
+    textPrimary: "#fff1f2",
+    textSec: "#fb7185",
+    textMuted: "#9f1239",
+    accent: "#f43f5e",
+    accentLight: "#fda4af",
+    accentGlow: "rgba(244,63,94,0.14)",
+    success: "#10b981",
+    warning: "#fbbf24",
+    danger: "#ef4444",
+    name: "Sunset Horizon"
   }
 };
 
@@ -825,10 +876,13 @@ export default function Widget() {
         {/* Theme dots & controls */}
         <div style={{ display: "flex", gap: "10px", marginTop: "12px", justifyContent: "space-between", alignItems: "center" }} onMouseDown={e => e.stopPropagation()}>
           {/* Theme selection dots */}
-          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap", maxWidth: "200px" }}>
             {(Object.keys(THEMES) as Array<keyof typeof THEMES>).map((t) => {
               const active = currentTheme === t;
-              const dotColors = { navy: "#6366f1", cyberpunk: "#d946ef", forest: "#10b981", amber: "#f59e0b" };
+              const dotColors = {
+                navy: "#6366f1", cyberpunk: "#d946ef", forest: "#10b981", amber: "#f59e0b",
+                royal: "#a855f7", ocean: "#0ea5e9", sunset: "#f43f5e"
+              };
               return (
                 <button
                   key={t}
@@ -874,7 +928,10 @@ export default function Widget() {
           </span>
           
           <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-            <span style={{ fontSize: "28px", fontWeight: 700, color: C.textPrimary, fontVariantNumeric: "tabular-nums" }}>
+            <span style={{
+              fontSize: "28px", fontWeight: 700, color: C.textPrimary, fontVariantNumeric: "tabular-nums",
+              animation: pomoActive ? "breathe 3s ease-in-out infinite" : "none"
+            }}>
               {minLeft}:{secLeft}
             </span>
 
@@ -1021,7 +1078,7 @@ export default function Widget() {
       {/* ══════════════════════════════════════════
           CONTENT SCROLLER
       ══════════════════════════════════════════ */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "8px 14px", scrollbarWidth: "none" }} onMouseDown={e=>e.stopPropagation()}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "8px 14px", scrollbarWidth: "none", animation: "fadeInSoft 0.4s ease-out forwards" }} onMouseDown={e=>e.stopPropagation()}>
 
         {/* ── TUGAS ──────────────────────────────────────── */}
         {tab === "tasks" && (
