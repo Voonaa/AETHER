@@ -91,6 +91,17 @@ const rgb = (h:string) => {
   return `${r},${g},${b}`;
 };
 
+const getTaskPriority = (text: string): "high" | "medium" | "low" => {
+  const t = text.toLowerCase();
+  const urgentKeywords = ["deadline", "urgent", "cepat", "sekarang", "now", "mendesak", "hari ini", "today", "asap", "!", "prioritas"];
+  const importantKeywords = ["belajar", "learn", "study", "pr", "project", "kerja", "work", "tugas", "kuliah", "sekolah", "ibadah", "tuhan", "alkitab", "doa", "bible", "health", "sehat", "olahraga", "gym", "workout", "meditasi"];
+  const isUrgent = urgentKeywords.some(kw => t.includes(kw));
+  const isImportant = importantKeywords.some(kw => t.includes(kw));
+  if (isUrgent) return "high";
+  if (isImportant) return "medium";
+  return "low";
+};
+
 const appWindow = getCurrentWindow();
 
 // ── Level Titles ─────────────────────────────────────────────
@@ -366,6 +377,18 @@ export default function Widget() {
   const noteRef  = useRef<HTMLTextAreaElement>(null);
   const motivRef = useRef<HTMLTextAreaElement>(null);
 
+  const focusActiveSecondsRef = useRef(0);
+
+  const triggerHealthReminder = () => {
+    playSound("finish_pomodoro");
+    if (Notification.permission === "granted") {
+      new Notification("Aether Health Reminder 💧", {
+        body: "Kamu sudah fokus selama 45 menit. Ayo berdiri, minum segelas air, dan regangkan ototmu sebentar! 🧘‍♂️",
+        silent: true,
+      });
+    }
+  };
+
   // ── Live Clock & Pomodoro Timer ─────────────────────────────
   useEffect(() => {
     const t = setInterval(() => {
@@ -374,11 +397,17 @@ export default function Widget() {
     return () => clearInterval(t);
   }, []);
 
-  // Pomodoro countdown timer tick
+  // Pomodoro countdown timer tick & Smart Health Reminders
   useEffect(() => {
     let timer: any;
     if (pomoActive) {
       timer = setInterval(() => {
+        focusActiveSecondsRef.current += 1;
+        if (focusActiveSecondsRef.current >= 2700) {
+          triggerHealthReminder();
+          focusActiveSecondsRef.current = 0;
+        }
+
         setPomoSeconds((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
@@ -639,7 +668,38 @@ export default function Widget() {
   const tasksList = data?.tasks || [];
   const notes     = captures.filter((c) => c.cap_type === "note");
   const pending   = tasksList.filter((t) => !t.completed);
+  const pendingSorted = [...pending].sort((a, b) => {
+    const prioA = getTaskPriority(a.text);
+    const prioB = getTaskPriority(b.text);
+    const val = { high: 3, medium: 2, low: 1 };
+    return val[prioB] - val[prioA];
+  });
   const done      = tasksList.filter((t) => t.completed);
+
+  const getAICoachAdvice = () => {
+    const uncompletedHabits = habits.filter(h => {
+      const todayStr = new Date().toLocaleDateString("sv-SE");
+      return h.last_completed !== todayStr;
+    });
+
+    if (todayMood === "tired" || todayMood === "anxious") {
+      return "Halo! Saya mendeteksi hari ini energi atau emosimu sedang tidak stabil. Jangan terlalu memaksakan diri. Selesaikan 1 tugas penting saja, lalu luangkan waktu untuk beristirahat. Ingat, kesehatanmu nomor satu! 🧘‍♂️";
+    }
+    if (pending.length === 0 && done.length > 0) {
+      return "Luar biasa! Semua tugas hari ini telah kamu selesaikan dengan sempurna. Kamu menunjukkan disiplin tingkat tinggi hari ini. Ambil waktu santai untuk menikmati harimu! 🏆";
+    }
+    if (uncompletedHabits.length > 0) {
+      return `Ada kebiasaan harian (${uncompletedHabits[0].text}) yang belum kamu centang hari ini. Sempatkan waktu 5 menit sekarang agar streak disiplinmu tidak terputus! 🔥`;
+    }
+    if (pending.length > 0) {
+      const urgentTask = pendingSorted.find(t => getTaskPriority(t.text) === "high");
+      if (urgentTask) {
+        return `Kamu memiliki tugas mendesak hari ini: "${urgentTask.text}". Ambil waktu 25 menit sesi Pomodoro sekarang untuk fokus menyelesaikannya! ⚡`;
+      }
+      return "Kondisimu tampak prima hari ini. Mari kita buat kemajuan kecil dengan mulai menyelesaikan satu tugas paling mudah terlebih dahulu. Konsistensi adalah kunci! 🚀";
+    }
+    return "Selamat datang di Aether! Tulis tugas pertamamu hari ini dan mari kita bangun kebiasaan produktif bersama-sama. Kamu bisa melakukannya! ✦";
+  };
   
   // XP Level Up Threshold
   const maxXP = stats.level * 100;
@@ -969,7 +1029,7 @@ export default function Widget() {
             {tasksList.length === 0 && !addTask && <EmptyState icon="✅" title="Selesai Semua!" sub='Ketuk "+ Tambah Tugas" dan dapatkan +10 XP tiap penyelesaian!' />}
 
             {pending.length > 0 && <SLabel text={`TUGAS AKTIF (+10 XP)  ·  ${pending.length}`} />}
-            {pending.map(t => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDel={delCapture} />)}
+            {pendingSorted.map(t => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDel={delCapture} />)}
 
             {done.length > 0 && <SLabel text={`SELESAI ✓  ·  ${done.length}`} />}
             {done.map(t => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDel={delCapture} />)}
@@ -1205,6 +1265,23 @@ export default function Widget() {
         {/* ── INSPIRASI ──────────────────────────────────── */}
         {tab === "motivasi" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "8px", paddingTop: "2px" }}>
+            {/* AI Productivity Coach Card */}
+            <div style={{
+              padding: "13px 15px", borderRadius: "14px",
+              background: `linear-gradient(135deg, rgba(${rgb(C.accent)},0.11) 0%, rgba(${rgb(C.accent)},0.03) 100%)`,
+              border: `1px solid rgba(${rgb(C.accent)},0.28)`,
+              position: "relative"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "7px" }}>
+                <span style={{ fontSize: "16px" }}>🤖</span>
+                <span style={{ fontSize: "11px", fontWeight: 800, color: C.accentLight, letterSpacing: "0.06em" }}>
+                  AI PRODUCTIVITY COACH
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: "12.5px", color: C.textPrimary, lineHeight: "1.65" }}>
+                {getAICoachAdvice()}
+              </p>
+            </div>
             {/* Form */}
             {(addMotiv || editMotiv) && (
               <div style={{ padding: "12px", borderRadius: "14px", background: `rgba(${rgb(C.accent)},0.07)`, border: `1.5px solid rgba(${rgb(C.accent)},0.28)` }}>
@@ -1359,12 +1436,25 @@ function AddRowBtn({ label, onClick }: { label: string; onClick: () => void }) {
 function TaskRow({ task, onToggle, onDel }:
   { task: { id: number; text: string; completed: boolean }; onToggle: (id: number) => void; onDel: (id: number) => void }) {
   const [hov, setHov] = useState(false);
+  const priority = getTaskPriority(task.text);
+
+  const badgeStyle = {
+    high: { bg: "rgba(239,68,68,0.14)", text: "#f87171", label: "Mendesak", border: "rgba(239,68,68,0.22)" },
+    medium: { bg: "rgba(245,158,11,0.12)", text: "#fbbf24", label: "Penting", border: "rgba(245,158,11,0.22)" },
+    low: { bg: "rgba(255,255,255,0.02)", text: "#94a3b8", label: "Normal", border: "rgba(255,255,255,0.06)" }
+  }[priority];
+
   return (
     <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)} style={{
       display: "flex", alignItems: "flex-start", gap: "9px",
-      padding: "7px 9px", marginBottom: "3px", borderRadius: "9px", position: "relative",
+      padding: "8px 10px", marginBottom: "3.5px", borderRadius: "10px", position: "relative",
       background: hov ? "rgba(255,255,255,0.035)" : "rgba(255,255,255,0.015)",
-      border: `1px solid ${hov ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)"}`,
+      border: `1.2px solid ${
+        task.completed ? "rgba(255,255,255,0.03)" :
+        priority === "high" ? "rgba(239,68,68,0.25)" :
+        priority === "medium" ? "rgba(245,158,11,0.25)" :
+        hov ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)"
+      }`,
       transition: "all 0.15s",
     }}>
       {/* Checkbox */}
@@ -1382,13 +1472,27 @@ function TaskRow({ task, onToggle, onDel }:
         )}
       </div>
 
-      {/* Text */}
-      <span onClick={() => onToggle(task.id)} style={{
-        fontSize: "12.5px", flex: 1, lineHeight: "1.45", cursor: "pointer", wordBreak: "break-word",
-        color: task.completed ? "#334155" : "#e2e8f0",
-        textDecoration: task.completed ? "line-through" : "none",
-        transition: "color 0.2s",
-      }}>{task.text}</span>
+      {/* Text & Priority Badge */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "3px", flex: 1, cursor: "pointer" }} onClick={() => onToggle(task.id)}>
+        <span style={{
+          fontSize: "12.5px", lineHeight: "1.45", wordBreak: "break-word",
+          color: task.completed ? "#334155" : "#e2e8f0",
+          textDecoration: task.completed ? "line-through" : "none",
+          transition: "color 0.2s",
+        }}>{task.text}</span>
+        
+        {!task.completed && (
+          <div style={{ display: "flex" }}>
+            <span style={{
+              fontSize: "8px", fontWeight: 700, padding: "1px 5px", borderRadius: "4px",
+              background: badgeStyle.bg, color: badgeStyle.text, border: `1px solid ${badgeStyle.border}`,
+              letterSpacing: "0.02em", textTransform: "uppercase"
+            }}>
+              {badgeStyle.label}
+            </span>
+          </div>
+        )}
+      </div>
 
       {/* Delete */}
       {hov && (
