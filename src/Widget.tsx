@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { CheckSquare, Flame, BookOpen, Sparkles, BarChart2, Moon, Volume2, Target, Pin, PinOff } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────
 interface Task       { id: number; text: string; cap_type: string; completed: boolean; }
@@ -13,123 +14,123 @@ interface MoodEntry  { id: number; mood: string; date: string; }
 // ── Design tokens & Themes ────────────────────────────────────
 const THEMES = {
   navy: {
-    bg: "linear-gradient(165deg, #070c14 0%, #03060a 100%)",
-    bgSurf: "rgba(255,255,255,0.025)",
-    bgSurf2: "rgba(255,255,255,0.055)",
-    border: "rgba(255,255,255,0.06)",
-    borderAcc: "rgba(99,102,241,0.3)",
-    textPrimary: "#f1f5f9",
+    bg: "#0f172a",
+    bgSurf: "rgba(255,255,255,0.03)",
+    bgSurf2: "rgba(255,255,255,0.06)",
+    border: "rgba(255,255,255,0.05)",
+    borderAcc: "rgba(99,102,241,0.2)",
+    textPrimary: "#f8fafc",
     textSec: "#94a3b8",
     textMuted: "#475569",
     accent: "#6366f1",
     accentLight: "#a5b4fc",
-    accentGlow: "rgba(99,102,241,0.12)",
+    accentGlow: "rgba(99,102,241,0.08)",
     success: "#10b981",
     warning: "#f59e0b",
     danger: "#ef4444",
-    name: "Calming Navy"
+    name: "Navy Matte"
   },
   cyberpunk: {
-    bg: "linear-gradient(165deg, #14051a 0%, #09020d 100%)",
+    bg: "#1e1b4b",
     bgSurf: "rgba(255,255,255,0.03)",
     bgSurf2: "rgba(255,255,255,0.06)",
-    border: "rgba(217,70,239,0.15)",
-    borderAcc: "rgba(217,70,239,0.4)",
-    textPrimary: "#fae8ff",
-    textSec: "#e879f9",
-    textMuted: "#701a75",
-    accent: "#d946ef",
-    accentLight: "#f472b6",
-    accentGlow: "rgba(217,70,239,0.14)",
+    border: "rgba(168,85,247,0.1)",
+    borderAcc: "rgba(168,85,247,0.2)",
+    textPrimary: "#faf5ff",
+    textSec: "#d8b4fe",
+    textMuted: "#9333ea",
+    accent: "#a855f7",
+    accentLight: "#e9d5ff",
+    accentGlow: "rgba(168,85,247,0.08)",
     success: "#10b981",
     warning: "#fbbf24",
     danger: "#ef4444",
-    name: "Cyberpunk Pink"
+    name: "Twilight Purple"
   },
   forest: {
-    bg: "linear-gradient(165deg, #04120c 0%, #010805 100%)",
-    bgSurf: "rgba(255,255,255,0.02)",
-    bgSurf2: "rgba(255,255,255,0.05)",
-    border: "rgba(16,185,129,0.12)",
-    borderAcc: "rgba(16,185,129,0.35)",
-    textPrimary: "#ecfdf5",
-    textSec: "#34d399",
-    textMuted: "#065f46",
+    bg: "#064e3b",
+    bgSurf: "rgba(255,255,255,0.03)",
+    bgSurf2: "rgba(255,255,255,0.06)",
+    border: "rgba(16,185,129,0.1)",
+    borderAcc: "rgba(16,185,129,0.25)",
+    textPrimary: "#f0fdf4",
+    textSec: "#6ee7b7",
+    textMuted: "#047857",
     accent: "#10b981",
-    accentLight: "#34d399",
-    accentGlow: "rgba(16,185,129,0.1)",
+    accentLight: "#a7f3d0",
+    accentGlow: "rgba(16,185,129,0.08)",
     success: "#34d399",
     warning: "#f59e0b",
-    danger: "#f87171",
-    name: "Emerald Forest"
+    danger: "#ef4444",
+    name: "Nordic Pine"
   },
   amber: {
-    bg: "linear-gradient(165deg, #180902 0%, #0c0401 100%)",
-    bgSurf: "rgba(255,255,255,0.02)",
-    bgSurf2: "rgba(255,255,255,0.055)",
-    border: "rgba(245,158,11,0.15)",
-    borderAcc: "rgba(245,158,11,0.4)",
-    textPrimary: "#fef3c7",
-    textSec: "#fbbf24",
-    textMuted: "#78350f",
+    bg: "#451a03",
+    bgSurf: "rgba(255,255,255,0.03)",
+    bgSurf2: "rgba(255,255,255,0.06)",
+    border: "rgba(245,158,11,0.1)",
+    borderAcc: "rgba(245,158,11,0.25)",
+    textPrimary: "#fffbeb",
+    textSec: "#fcd34d",
+    textMuted: "#b45309",
     accent: "#f59e0b",
-    accentLight: "#fbbf24",
-    accentGlow: "rgba(245,158,11,0.12)",
-    success: "#10b981",
-    warning: "#fbbf24",
-    danger: "#f87171",
-    name: "Warm Amber"
-  },
-  royal: {
-    bg: "linear-gradient(165deg, #0e0517 0%, #06020a 100%)",
-    bgSurf: "rgba(255,255,255,0.025)",
-    bgSurf2: "rgba(255,255,255,0.05)",
-    border: "rgba(168,85,247,0.15)",
-    borderAcc: "rgba(168,85,247,0.4)",
-    textPrimary: "#faf5ff",
-    textSec: "#c084fc",
-    textMuted: "#6b21a8",
-    accent: "#a855f7",
-    accentLight: "#d8b4fe",
-    accentGlow: "rgba(168,85,247,0.14)",
+    accentLight: "#fde68a",
+    accentGlow: "rgba(245,158,11,0.08)",
     success: "#10b981",
     warning: "#fbbf24",
     danger: "#ef4444",
-    name: "Royal Amethyst"
+    name: "Warm Sepia"
+  },
+  royal: {
+    bg: "#3b0764",
+    bgSurf: "rgba(255,255,255,0.03)",
+    bgSurf2: "rgba(255,255,255,0.06)",
+    border: "rgba(192,132,252,0.1)",
+    borderAcc: "rgba(192,132,252,0.25)",
+    textPrimary: "#faf5ff",
+    textSec: "#d8b4fe",
+    textMuted: "#9333ea",
+    accent: "#a855f7",
+    accentLight: "#e9d5ff",
+    accentGlow: "rgba(168,85,247,0.08)",
+    success: "#10b981",
+    warning: "#fbbf24",
+    danger: "#ef4444",
+    name: "Royal Velvet"
   },
   ocean: {
-    bg: "linear-gradient(165deg, #021017 0%, #01060a 100%)",
-    bgSurf: "rgba(255,255,255,0.02)",
-    bgSurf2: "rgba(255,255,255,0.05)",
-    border: "rgba(14,165,233,0.12)",
-    borderAcc: "rgba(14,165,233,0.35)",
+    bg: "#082f49",
+    bgSurf: "rgba(255,255,255,0.03)",
+    bgSurf2: "rgba(255,255,255,0.06)",
+    border: "rgba(14,165,233,0.1)",
+    borderAcc: "rgba(14,165,233,0.25)",
     textPrimary: "#f0f9ff",
-    textSec: "#38bdf8",
-    textMuted: "#0369a1",
+    textSec: "#7dd3fc",
+    textMuted: "#0284c7",
     accent: "#0ea5e9",
-    accentLight: "#7dd3fc",
-    accentGlow: "rgba(14,165,233,0.12)",
+    accentLight: "#bae6fd",
+    accentGlow: "rgba(14,165,233,0.08)",
     success: "#34d399",
     warning: "#f59e0b",
-    danger: "#f87171",
+    danger: "#ef4444",
     name: "Deep Ocean"
   },
   sunset: {
-    bg: "linear-gradient(165deg, #1a0808 0%, #0a0202 100%)",
-    bgSurf: "rgba(255,255,255,0.025)",
-    bgSurf2: "rgba(255,255,255,0.05)",
-    border: "rgba(244,63,94,0.15)",
-    borderAcc: "rgba(244,63,94,0.4)",
+    bg: "#4c0519",
+    bgSurf: "rgba(255,255,255,0.03)",
+    bgSurf2: "rgba(255,255,255,0.06)",
+    border: "rgba(244,63,94,0.1)",
+    borderAcc: "rgba(244,63,94,0.25)",
     textPrimary: "#fff1f2",
-    textSec: "#fb7185",
-    textMuted: "#9f1239",
+    textSec: "#fda4af",
+    textMuted: "#e11d48",
     accent: "#f43f5e",
-    accentLight: "#fda4af",
-    accentGlow: "rgba(244,63,94,0.14)",
+    accentLight: "#fecdd3",
+    accentGlow: "rgba(244,63,94,0.08)",
     success: "#10b981",
     warning: "#fbbf24",
     danger: "#ef4444",
-    name: "Sunset Horizon"
+    name: "Crimson Sunset"
   }
 };
 
@@ -1010,7 +1011,13 @@ export default function Widget() {
                   background: ambientType === t ? `rgba(${rgb(C.accent)}, 0.15)` : "rgba(255,255,255,0.03)",
                   color: ambientType === t ? C.accentLight : C.textSec
                 }}>
-                  {t === "rain" ? "🌧️ Hujan" : t === "wind" ? "🌬️ Angin" : t === "brown" ? "🍂 Brown" : t === "lofi" ? "🎵 Lo-Fi" : "Hening"}
+                  <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                    {t === "rain" && <Volume2 size={12} />}
+                    {t === "wind" && <Volume2 size={12} />}
+                    {t === "brown" && <Volume2 size={12} />}
+                    {t === "lofi" && <Volume2 size={12} />}
+                    {t === "rain" ? "Hujan" : t === "wind" ? "Angin" : t === "brown" ? "Brown" : t === "lofi" ? "Lo-Fi" : "Hening"}
+                  </div>
                 </button>
               ))}
             </div>
@@ -1065,11 +1072,11 @@ export default function Widget() {
         background: "rgba(0,0,0,0.18)",
       }} onMouseDown={e=>e.stopPropagation()}>
         {[
-          { id: "tasks", label: "Tugas", icon: "📋", count: pending.length },
-          { id: "habits", label: "Habit", icon: "🔥", count: habits.length },
-          { id: "notes", label: "Jurnal", icon: "📝", count: notes.length },
-          { id: "motivasi", label: "Inspirasi", icon: "✨", count: motivations.length },
-          { id: "stats", label: "Stats", icon: "📊", count: 0 }
+          { id: "tasks", label: "Tugas", icon: <CheckSquare size={15} />, count: pending.length },
+          { id: "habits", label: "Habit", icon: <Flame size={15} />, count: habits.length },
+          { id: "notes", label: "Jurnal", icon: <BookOpen size={15} />, count: notes.length },
+          { id: "motivasi", label: "Inspirasi", icon: <Sparkles size={15} />, count: motivations.length },
+          { id: "stats", label: "Stats", icon: <BarChart2 size={15} />, count: 0 }
         ].map((t) => {
           const isAct = tab === t.id;
           return (
@@ -1099,14 +1106,14 @@ export default function Widget() {
           <div>
             {pending.length > 0 && new Date().getHours() >= 20 && (
               <div style={{
-                padding: "10px 12px", borderRadius: "10px", marginBottom: "10px",
-                background: "rgba(244,63,94,0.1)", border: "1px solid rgba(244,63,94,0.3)",
-                display: "flex", gap: "10px", alignItems: "center"
+                padding: "12px 14px", borderRadius: "10px", marginBottom: "12px",
+                background: "rgba(244,63,94,0.06)", border: "1px solid rgba(244,63,94,0.15)",
+                display: "flex", gap: "10px", alignItems: "flex-start"
               }}>
-                <span style={{ fontSize: "20px" }}>🌙</span>
+                <Moon size={18} color="#fda4af" style={{ marginTop: "2px" }} />
                 <div style={{ display: "flex", flexDirection: "column" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 700, color: "#fda4af" }}>AI COACH: HARI SUDAH MALAM</span>
-                  <span style={{ fontSize: "10.5px", color: "#ffe4e6", lineHeight: "1.4" }}>Anda masih memiliki {pending.length} tugas yang tertunda. Pertimbangkan untuk menyalakan <b>Focus Mode</b> atau lanjutkan besok.</span>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: "#fda4af", marginBottom: "3px" }}>AETHER INSIGHTS</span>
+                  <span style={{ fontSize: "11px", color: C.textSec, lineHeight: "1.5" }}>Malam telah tiba. Anda memiliki <b>{pending.length} tugas</b> yang belum selesai. Jangan paksakan diri, pertimbangkan untuk beristirahat.</span>
                 </div>
               </div>
             )}
@@ -1123,7 +1130,7 @@ export default function Widget() {
               </div>
             )}
 
-            {tasksList.length === 0 && !addTask && <EmptyState icon="✅" title="Selesai Semua!" sub='Ketuk "+ Tambah Tugas" dan dapatkan +10 XP tiap penyelesaian!' />}
+            {tasksList.length === 0 && !addTask && <EmptyState icon={<CheckSquare size={32} color="#94a3b8" />} title="Selesai Semua!" sub='Ketuk "+ Tambah Tugas" dan selesaikan untuk progres Anda' />}
 
             {pending.length > 0 && <SLabel text={`TUGAS AKTIF (+10 XP)  ·  ${pending.length}`} />}
             {pendingSorted.map(t => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDel={delCapture} onFocus={() => { if(!focusMode) handleFocus(); }} />)}
@@ -1149,7 +1156,7 @@ export default function Widget() {
         {/* ── HABIT / KEBIASAAN ───────────────────────────── */}
         {tab === "habits" && (
           <div>
-            {habits.length === 0 && !addHabit && <EmptyState icon="🔥" title="Bangun Habit Produktif" sub='Kembangkan streak kebiasaanmu dan dapatkan +15 XP setiap hari!' />}
+            {habits.length === 0 && !addHabit && <EmptyState icon={<Flame size={32} color="#94a3b8" />} title="Bangun Kebiasaan" sub='Kembangkan runtutan kebiasaanmu secara perlahan' />}
 
             {habits.length > 0 && <SLabel text={`HABIT HARIAN (+15 XP)`} />}
             {habits.map(h => {
@@ -1336,7 +1343,7 @@ export default function Widget() {
               )}
             </div>
 
-            {notes.length === 0 && !addNote && <EmptyState icon="📝" title="Jurnal Harian" sub='Tulis refleksi hari ini, ide menarik, atau rasa syukur untuk menjaga pikiranmu tetap jernih!' />}
+            {notes.length === 0 && !addNote && <EmptyState icon={<BookOpen size={32} color="#94a3b8" />} title="Jurnal Harian" sub='Tulis refleksi, ide menarik, atau rasa syukur untuk menjaga pikiranmu tetap jernih!' />}
 
             {notes.map((n, i) => (
               <NoteCard key={n.id} note={n} accent={NOTE_ACCENTS[i % NOTE_ACCENTS.length]} onDel={delCapture} />
@@ -1513,21 +1520,34 @@ export default function Widget() {
               background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`,
               display: "flex", gap: "8px"
             }}>
-              <button onClick={async () => {
+              <button onClick={async (e) => {
+                const btn = e.currentTarget;
+                const oldText = btn.innerHTML;
                 try {
-                  const path = await invoke<string>("export_backup");
-                  alert(`Backup berhasil disimpan ke: \n${path}`);
-                } catch(e) { alert("Gagal backup: " + e); }
+                  await invoke<string>("export_backup");
+                  btn.innerHTML = "✅ Backup Sukses!";
+                  setTimeout(() => btn.innerHTML = oldText, 3000);
+                } catch(err) { 
+                  btn.innerHTML = "❌ Gagal Backup";
+                  setTimeout(() => btn.innerHTML = oldText, 3000);
+                }
               }} style={{ ...okBtn, flex: 1, justifyContent: "center", background: "rgba(16,185,129,0.15)", color: "#34d399" }}>
                 📥 Backup Data
               </button>
-              <button onClick={async () => {
-                if (window.confirm("Restore akan MENGHAPUS data saat ini dan menggantinya dengan data backup dari Desktop. Lanjutkan?")) {
+              <button onClick={async (e) => {
+                const btn = e.currentTarget;
+                if (btn.innerText.includes("YAKIN")) {
                   try {
                     await invoke("import_backup");
-                    alert("Restore berhasil! Widget akan dimuat ulang.");
-                    window.location.reload();
-                  } catch(e) { alert("Gagal restore: " + e); }
+                    btn.innerHTML = "✅ Restore Sukses!";
+                    setTimeout(() => window.location.reload(), 1500);
+                  } catch(err) { 
+                    btn.innerHTML = "❌ Gagal Restore";
+                    setTimeout(() => btn.innerHTML = "📤 Restore", 3000);
+                  }
+                } else {
+                  btn.innerHTML = "⚠️ YAKIN? KLIK LAGI";
+                  setTimeout(() => { if (btn.innerText.includes("YAKIN")) btn.innerHTML = "📤 Restore"; }, 3000);
                 }
               }} style={{ ...xBtn, flex: 1, justifyContent: "center", borderColor: "rgba(239,68,68,0.3)", color: "#f87171" }}>
                 📤 Restore
@@ -1601,7 +1621,7 @@ function PinBtn({ pinned, onClick }: { pinned: boolean; onClick: () => void }) {
         display: "flex", alignItems: "center", justifyContent: "center",
         transition: "all 0.2s",
         boxShadow: pinned ? "0 0 10px rgba(245,158,11,0.15)" : "none",
-      }}>📌</button>
+      }}>{pinned ? <PinOff size={14} /> : <Pin size={14} />}</button>
   );
 }
 
@@ -1612,10 +1632,11 @@ function FocusBtn({ active, onClick }: { active: boolean; onClick: () => void })
         padding: "4px 11px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer",
         border: active ? "1px solid rgba(99,102,241,0.4)" : "1px solid rgba(255,255,255,0.1)",
         background: active ? "rgba(99,102,241,0.18)" : "rgba(255,255,255,0.04)",
-        color: active ? "#a5b4fc" : "#475569",
-        transition: "all 0.2s", letterSpacing: "0.03em",
-      }}>
-      {active ? "⚡ Focus" : "Focus"}
+      color: active ? "#a5b4fc" : "#475569",
+      transition: "all 0.2s", letterSpacing: "0.03em",
+      display: "flex", alignItems: "center", gap: "4px"
+    }}>
+      <Target size={12} /> {active ? "FOKUS AKTIF" : "FOKUS"}
     </button>
   );
 }
@@ -1755,7 +1776,7 @@ function NoteCard({ note, accent, onDel }:
   );
 }
 
-function EmptyState({ icon, title, sub }: { icon: string; title: string; sub: string }) {
+function EmptyState({ icon, title, sub }: { icon: React.ReactNode; title: string; sub: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "24px 10px", gap: "6px" }}>
       <span style={{ fontSize: "26px" }}>{icon}</span>
