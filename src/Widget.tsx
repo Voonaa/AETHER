@@ -1097,6 +1097,20 @@ export default function Widget() {
         {/* ── TUGAS ──────────────────────────────────────── */}
         {tab === "tasks" && (
           <div>
+            {pending.length > 0 && new Date().getHours() >= 20 && (
+              <div style={{
+                padding: "10px 12px", borderRadius: "10px", marginBottom: "10px",
+                background: "rgba(244,63,94,0.1)", border: "1px solid rgba(244,63,94,0.3)",
+                display: "flex", gap: "10px", alignItems: "center"
+              }}>
+                <span style={{ fontSize: "20px" }}>🌙</span>
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: "#fda4af" }}>AI COACH: HARI SUDAH MALAM</span>
+                  <span style={{ fontSize: "10.5px", color: "#ffe4e6", lineHeight: "1.4" }}>Anda masih memiliki {pending.length} tugas yang tertunda. Pertimbangkan untuk menyalakan <b>Focus Mode</b> atau lanjutkan besok.</span>
+                </div>
+              </div>
+            )}
+
             {tasksList.length > 0 && (
               <div style={{ padding: "0 4px 10px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: C.textSec, fontWeight: 700, marginBottom: "4px" }}>
@@ -1405,6 +1419,120 @@ export default function Widget() {
             })}
 
             {!addMotiv && !editMotiv && <AddRowBtn label="Tambah Inspirasi Baru" onClick={() => setAddMotiv(true)} />}
+          </div>
+        )}
+
+        {/* ── STATS & SETTINGS ───────────────────────────── */}
+        {tab === "stats" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px", paddingBottom: "10px" }}>
+            {/* Gamification Stats */}
+            <div style={{
+              padding: "16px 14px", borderRadius: "14px",
+              background: `linear-gradient(135deg, rgba(${rgb(C.accent)},0.12) 0%, rgba(${rgb(C.accent)},0.04) 100%)`,
+              border: `1px solid rgba(${rgb(C.accent)},0.2)`,
+              display: "flex", flexDirection: "column", gap: "12px",
+              boxShadow: `0 4px 20px rgba(${rgb(C.accent)},0.05)`
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                  <span style={{ fontSize: "10px", color: C.accentLight, fontWeight: 700, letterSpacing: "0.1em" }}>LEVEL {stats.level}</span>
+                  <span style={{ fontSize: "16px", color: C.textPrimary, fontWeight: 800 }}>{getLevelName(stats.level)}</span>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <span style={{ fontSize: "14px", color: C.textPrimary, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{stats.xp}</span>
+                  <span style={{ fontSize: "10px", color: C.textSec, fontWeight: 700 }}> / {stats.level * 100} XP</span>
+                </div>
+              </div>
+              <div style={{ width: "100%", height: "6px", background: "rgba(255,255,255,0.08)", borderRadius: "99px", overflow: "hidden" }}>
+                <div style={{
+                  height: "100%", width: `${Math.min(100, (stats.xp / (stats.level * 100)) * 100)}%`,
+                  background: C.accent, borderRadius: "99px", transition: "width 0.5s ease-out"
+                }}/>
+              </div>
+            </div>
+
+            {/* Ambient Soundscape Player */}
+            <div style={{
+              padding: "12px 14px", borderRadius: "14px",
+              background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`,
+              display: "flex", flexDirection: "column", gap: "10px"
+            }}>
+              <span style={{ fontSize: "10px", color: C.textSec, fontWeight: 700, letterSpacing: "0.08em" }}>AMBIENT SOUNDSCAPE</span>
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                {["rain", "wind", "brown", "lofi", "off"].map((t) => (
+                  <button key={t} onClick={() => setAmbientType(t as any)} style={{
+                    flex: 1, minWidth: "60px", padding: "8px 6px", borderRadius: "8px", fontSize: "10px", fontWeight: 700,
+                    cursor: "pointer", transition: "all 0.2s",
+                    border: ambientType === t ? `1px solid rgba(${rgb(C.accent)}, 0.4)` : "1px solid rgba(255,255,255,0.1)",
+                    background: ambientType === t ? `rgba(${rgb(C.accent)}, 0.15)` : "rgba(255,255,255,0.03)",
+                    color: ambientType === t ? C.accentLight : C.textSec
+                  }}>
+                    {t === "rain" ? "🌧️ Hujan" : t === "wind" ? "🌬️ Angin" : t === "brown" ? "🍂 Brown" : t === "lofi" ? "🎵 Lo-Fi" : "Hening"}
+                  </button>
+                ))}
+              </div>
+              {ambientType !== "off" && (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", marginTop: "2px" }}>
+                  <span style={{ fontSize: "12px" }}>🔈</span>
+                  <input type="range" min="0" max="0.8" step="0.05" value={ambientVol} onChange={(e) => setAmbientVol(parseFloat(e.target.value))}
+                    style={{ flex: 1, height: "4px", borderRadius: "99px", accentColor: C.accent, background: "rgba(255,255,255,0.1)", outline: "none", cursor: "pointer" }} />
+                  <span style={{ fontSize: "12px" }}>🔊</span>
+                </div>
+              )}
+            </div>
+
+            {/* Theme Switcher */}
+            <div style={{
+              padding: "12px 14px", borderRadius: "14px",
+              background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`,
+            }}>
+              <span style={{ fontSize: "10px", color: C.textSec, fontWeight: 700, letterSpacing: "0.08em", display: "block", marginBottom: "10px" }}>TEMA APLIKASI</span>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px" }}>
+                {(Object.keys(THEMES) as Array<keyof typeof THEMES>).map((t) => {
+                  const active = currentTheme === t;
+                  const dotColors = { navy: "#6366f1", cyberpunk: "#d946ef", forest: "#10b981", amber: "#f59e0b", royal: "#a855f7", ocean: "#0ea5e9", sunset: "#f43f5e" };
+                  const bColor = dotColors[t as keyof typeof dotColors] || "#ffffff";
+                  return (
+                    <button key={t} onClick={async () => { playSound("click"); setCurrentTheme(t as any); try { await invoke("set_theme", { theme: t }); } catch {} }}
+                      style={{
+                        padding: "8px 0", borderRadius: "8px", background: "rgba(255,255,255,0.03)",
+                        border: active ? `1.5px solid ${bColor}` : "1px solid transparent",
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", cursor: "pointer",
+                      }}>
+                      <div style={{ width: "16px", height: "16px", borderRadius: "50%", background: bColor, boxShadow: active ? `0 0 10px ${bColor}` : "none" }} />
+                      <span style={{ fontSize: "8.5px", color: active ? C.textPrimary : C.textMuted, fontWeight: active ? 700 : 500 }}>{THEMES[t as keyof typeof THEMES].name.split(' ')[0]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Backup & Restore */}
+            <div style={{
+              padding: "12px 14px", borderRadius: "14px",
+              background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`,
+              display: "flex", gap: "8px"
+            }}>
+              <button onClick={async () => {
+                try {
+                  const path = await invoke<string>("export_backup");
+                  alert(`Backup berhasil disimpan ke: \n${path}`);
+                } catch(e) { alert("Gagal backup: " + e); }
+              }} style={{ ...okBtn, flex: 1, justifyContent: "center", background: "rgba(16,185,129,0.15)", color: "#34d399" }}>
+                📥 Backup Data
+              </button>
+              <button onClick={async () => {
+                if (window.confirm("Restore akan MENGHAPUS data saat ini dan menggantinya dengan data backup dari Desktop. Lanjutkan?")) {
+                  try {
+                    await invoke("import_backup");
+                    alert("Restore berhasil! Widget akan dimuat ulang.");
+                    window.location.reload();
+                  } catch(e) { alert("Gagal restore: " + e); }
+                }
+              }} style={{ ...xBtn, flex: 1, justifyContent: "center", borderColor: "rgba(239,68,68,0.3)", color: "#f87171" }}>
+                📤 Restore
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -124,6 +124,11 @@ export default function Palette() {
                   : "Focus Mode Off. Welcome back.",
                 silent: true
               });
+            } else if (status === "workflow_generated" && Notification.permission === "granted") {
+              new Notification("Aether AI Workflow", {
+                body: "Workflow tasks generated successfully! Check your widget.",
+                silent: true
+              });
             }
 
             // Clear input text and results

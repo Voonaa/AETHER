@@ -31,6 +31,48 @@ pub fn save_capture(text: String, state: State<'_, DbState>) -> Result<String, S
         return Ok(if next_val == "true" { "focus_enabled".to_string() } else { "focus_disabled".to_string() });
     }
 
+    // Intercept /plan command
+    if trimmed.to_lowercase().starts_with("/plan ") {
+        let goal = trimmed[6..].trim();
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        
+        // Basic heuristic mock AI
+        let goal_lower = goal.to_lowercase();
+        let mut tasks = vec![];
+        if goal_lower.contains("laravel") {
+            tasks = vec![
+                format!("Setup Laravel project for {}", goal),
+                "Configure database & .env".to_string(),
+                "Create initial migrations".to_string(),
+                "Build core REST endpoints".to_string(),
+            ];
+        } else if goal_lower.contains("react") {
+             tasks = vec![
+                format!("Initialize React app for {}", goal),
+                "Setup Tailwind & routing".to_string(),
+                "Build core components".to_string(),
+                "Integrate with backend API".to_string(),
+            ];
+        } else {
+             tasks = vec![
+                format!("Define requirements for {}", goal),
+                "Set up project repository".to_string(),
+                "Create initial architecture draft".to_string(),
+                "Execute first milestone".to_string(),
+            ];
+        }
+
+        for task in tasks {
+            conn.execute(
+                "INSERT INTO captures (text, type) VALUES (?1, 'task')",
+                [&task],
+            ).map_err(|e| e.to_string())?;
+        }
+
+        println!("Command parsed: /plan. Generated workflow for: {}", goal);
+        return Ok("workflow_generated".to_string());
+    }
+
     // Parse slash command prefixes
     let (content, cap_type) = if trimmed.to_lowercase().starts_with("/task ") {
         (&trimmed[6..], "task")
